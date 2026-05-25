@@ -1,6 +1,6 @@
 # 站点骨架样板
 
-按站点类型挑一个最接近的起手，再按 [[../SKILL]] 工作流逐步实测增量。
+按站点类型挑一个最接近的起手，再按 [[SKILL.md]] 工作流逐步实测增量。
 
 四类样板：
 
@@ -122,7 +122,7 @@
 }
 ```
 
-> **更好的写法**：`bookList` 用 `<js>` 块拼好完整对象（带完整 URL），字段全用 `$.bookUrl` / `$.coverUrl` 直读，避免每个字段写 `@js:` 拼接。见 [[rule-syntax]] §bookList 进阶。
+> **更好的写法**：`bookList` 用 `<js>` 块拼好完整对象（带完整 URL），字段全用 `$.bookUrl` / `$.coverUrl` 直读，避免每个字段写 `@js:` 拼接。见 [[references/rule-syntax.md]] §bookList 进阶。
 
 ---
 
@@ -159,7 +159,7 @@
 - `loginCheckJs` 是 IIFE，必须 `return res`（StrResponse 类型）
 - 触发重登：`source.removeLoginInfo()` + `java.toast` 提示
 
-CloudFlare 站点的 `loginCheckJs` 模板见 [[anti-bot]]。
+CloudFlare 站点的 `loginCheckJs` 模板见 [[references/anti-bot.md]]。
 
 ---
 
@@ -207,7 +207,7 @@ CloudFlare 站点的 `loginCheckJs` 模板见 [[anti-bot]]。
 
 要点：
 - 正文构造 `<img>` 标签序列。每张图 URL 后拼 `,{"headers":{"Referer":"..."}}` 自带请求头
-- 加密图片：用 `imageDecode` 字段写 AES/XOR 解密 JS，见 [[js-api]] §AES/XOR 图片解密
+- 加密图片：用 `imageDecode` 字段写 AES/XOR 解密 JS，见 [[references/js-api.md]] §AES/XOR 图片解密
 - 字体反爬不适用（漫画无文本）
 
 ---

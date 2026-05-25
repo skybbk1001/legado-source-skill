@@ -34,14 +34,7 @@ curl -i -A 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36' \
 
 ### 4. 让用户在 App 里实测（你无法做）
 
-交付 JSON 时同时给用户一份"测试清单"，请他们反馈：
-
-- "搜索 `斗罗大陆`，看到几条结果？字段有缺吗？"
-- "打开第一本书的详情页，字段全吗？封面显示吗？"
-- "点最新章节，正文有吗？段落正常吗？"
-- "翻到下一章，能翻吗？"
-
-用户也可以引导他们用 **Legado 内置的源调试**（长按书源 → 调试），那里能看每步请求 URL、响应状态、字段匹配结果——但这是用户操作，AI 拿不到。
+交付 JSON 时同时请他们反馈结果
 
 ### 5. JS 运行时值（用户帮忙打）
 
@@ -55,6 +48,41 @@ java.logType(variable);                 // 类型 + 值
 
 用户跑一次、截图日志或弹窗给你，再删掉这些临时打印。
 
+### 6. Playwright 交叉验证加解密
+
+站点用了 AES/RSA/MD5 等加解密时，不在混淆 JS 里逆向着猜，直接跑函数抓中间值。
+
+**实现优先级**：
+
+1. **网页函数可用 → 直接用** — 网页的 CryptoJS 函数已通过浏览器验证正确，复制到 `<js>` 规则即可（Legado 内置 CryptoJS）
+2. **网页函数不可用 → 写 CryptoJS** — Rhino 引擎内建 CryptoJS，与网页实现一致，避免 Java `javax.crypto` 的细微差异
+3. **都不行 → 才用 `java.createSymmetricCrypto`** — Java 原生加密在编码、填充、密钥派生上可能与网页行为不同
+
+**流程**：
+
+1. Playwright evaluate 调用网页真实加解密函数，记录输入 → 输出
+2. 用标准 Web Crypto API 复现，逐段对比 key/iv/ct，确认算法理解正确
+3. 优先将网页的 CryptoJS 代码直接迁入 `<js>` 规则；只有网页函数不可提取时才手写等效逻辑
+
+**验证模板**：
+
+```js
+// 1. 调网页函数抓参考值
+browser_evaluate: () => {
+  const enc = encryptText('test');           // 搜索加密
+  const dec = openUrl(encUrl);               // URL 解密
+  return { enc, dec, num, numStr: window.numStr };
+}
+
+// 2. 用标准 Web Crypto API 交叉验证
+browser_evaluate: async () => {
+  const key = new TextEncoder().encode(md5Hex);
+  const ck = await crypto.subtle.importKey('raw', key, 'AES-CBC', false, ['decrypt']);
+  const dec = await crypto.subtle.decrypt({name:'AES-CBC', iv}, ck, ct);
+  return new TextDecoder().decode(dec);
+}
+```
+
 ## 按现象排查
 
 ### 搜索
@@ -67,10 +95,10 @@ java.logType(variable);                 // 类型 + 值
 | 完全无结果 | 站点是 JSON API，规则按 HTML 写 | Network 看 XHR；改用 `$.` JsonPath |
 | 完全无结果 | `bookList` 选错（匹配到 0 个元素） | 调试输出看 `bookList` 匹配数 |
 | 只出 1 条 | `bookList` 匹配到包装容器 | `bookList` 切到单项元素（如 `ul > li` 而非 `ul`） |
-| 缺字段（如作者空） | 字段在 `bookList` 元素之外的兄弟元素 | 切兄弟做 `bookList`（接受缺字段，详情页补全），或 JS bookList 拼对象（见 [[rule-syntax]] §bookList 进阶） |
+| 缺字段（如作者空） | 字段在 `bookList` 元素之外的兄弟元素 | 切兄弟做 `bookList`（接受缺字段，详情页补全），或 JS bookList 拼对象（见 [[references/rule-syntax.md]] §bookList 进阶） |
 | 缺字段（个别书空） | 选择器只对部分书生效 | 用 `\|\|` 回退：`primary@text\|\|fallback@text` |
 | 第 2 页起为空 | 站点无 `page` 参数，或参数名不是 `page` | 看实际翻页 URL 改 `{{page}}` 位置；不分页可去掉 |
-| POST 搜索后 302 跳转 | 重定向 URL 不带 cookie | `searchUrl` 用 JS（见 [[js-api]] §重定向搜索） |
+| POST 搜索后 302 跳转 | 重定向 URL 不带 cookie | `searchUrl` 用 JS（见 [[references/js-api.md]] §重定向搜索） |
 | `checkKeyWord` 报错 | 关键词太冷门，站点结果库无 | 改用站点确实有的常见词（如 "斗罗大陆"） |
 
 ### 详情
@@ -89,7 +117,8 @@ java.logType(variable);                 // 类型 + 值
 
 | 现象 | 可能原因 | 修复 |
 |---|---|---|
-| 章节缺失/只有首页 | 目录分页但未配 | 加 `nextTocUrl` |
+| 章节缺失/只有首页 | 目录分页但未配 | 加 `nextTocUrl`。先 Playwright 点"下一页"抓 Network 确认是 URL 参数还是 AJAX POST |
+| 翻页是 AJAX POST | 站点用 JS 加载后续章节 | chapterList 改 JS：检测 JSON 响应 → `$.data[*]`；nextTocUrl 用 `,{"method":"POST","body":"..."}` 发送post请求 |
 | **App 卡死** | `nextTocUrl` 末页仍命中 → 死循环 | 末页选择器必须返回空。改用 `a:contains(下一页)@href` 等"只在有下一页时存在"的选择器 |
 | 章节顺序乱 | 站点把"最新章节"列在前面 | `chapterList` 选目录区，避开"最新章节"区 |
 | 卷+章节嵌套（API） | JsonPath 不支持嵌套数组扁平化 | JS 写 chapterList，扁平化为单层数组 |
@@ -106,18 +135,18 @@ java.logType(variable);                 // 类型 + 值
 | 正文残留 `<amp-img>` / `<mip-*>` 标签 | 非标准 HTML，转换器漏 | `replaceRegex` 的 `|` 列表加 `</?amp-[^>]*>` |
 | 翻页章节缺后半 | `nextContentUrl` 漏配 | 加 `nextContentUrl` |
 | 翻页死循环 | 末页 `nextContentUrl` 仍命中 | 同 `nextTocUrl` 处理 |
-| 乱码方块字 | 字体反爬 | `java.queryTTF()` + `java.replaceFont()`，见 [[js-api]] §字体反爬 |
+| 乱码方块字 | 字体反爬 | `java.queryTTF()` + `java.replaceFont()`，见 [[references/js-api.md]] §字体反爬 |
 | 图片不显示 | Referer 检查 | 图片 URL 拼 `,{"headers":{"Referer":"..."}}` |
-| 图片需解密 | 加密 CDN | `imageDecode` 写解密 JS，见 [[js-api]] §AES/XOR 图片解密 |
+| 图片需解密 | 加密 CDN | `imageDecode` 写解密 JS，见 [[references/js-api.md]] §AES/XOR 图片解密 |
 
 ### 反爬
 
 | 现象 | 处理 |
 |---|---|
-| 响应是 CF 验证页（含 `_cf_chl_opt`、`Just a moment`） | 按 [[anti-bot]] 配 `loginCheckJs` 完整模板 |
+| 响应是 CF 验证页（含 `_cf_chl_opt`、`Just a moment`） | 按 [[references/anti-bot.md]] 配 `loginCheckJs` 完整模板 |
 | 浏览器能开、App 不能 | cookie/session 问题，`enabledCookieJar: true` 或转 WebView |
 | WebView 自动验证失败 | 后备到 `startBrowser` 手动 |
-| 频繁被封 IP | `concurrentRate` 调大（如 `"3/1000"` 改 `"1/2000"`） |
+| 频繁被封 IP | `concurrentRate` 调大（如 `"500"` 改 `"2000"`，或 `"3/1000"` 改 `"1/3000"`） |
 | 验证码 | `java.ocr()`（仅字母数字）或 `java.getVerificationCode()` 弹窗 |
 
 ### 登录
@@ -127,19 +156,6 @@ java.logType(variable);                 // 类型 + 值
 | 需先登录才能搜 | `loginUrl` + `loginUi`（表单）+ `loginCheckJs` |
 | 登录后 cookie 失效 | `loginCheckJs` 检测 → 重登 |
 | 用户改密后旧 cookie 失效 | `loginCheckJs` 里 `source.removeLoginInfo()` 触发重登 |
-
-## JS 语法常见坑
-
-| 现象 | 原因 | 修复 |
-|---|---|---|
-| `String.prototype.replace is not a function`（或 replace 不支持正则） | 来自 Java 层的值是 java.lang.String，不是 JS string | `String(x).replace(...)` 强转 |
-| `SyntaxError: missing ; before statement` 在 `async` 行 | Rhino 不支持 `async/await` | 改 Promise 链或同步 |
-| `class X` 报错 | Rhino 不支持 ES6 class | 改 function + prototype |
-| `fn(...arr)` 报错 | Rhino 不支持函数调用展开 | `fn.apply(null, arr)` |
-| `return` 报"函数外使用 return" | JS 块顶层不能裸 return | 整段包 IIFE：`(()=>{ ... return x; })()` |
-| 空字符串走 if 分支（`if(s)` 命中） | Java 空 String 转 JS bool 为 true | 用 `String(s) === ""` 或 `String(s).length === 0` 判空 |
-| `for...of` 遍历 java.util.List 报错 | Rhino-Java 互操作问题 | 用 `list.size()` + `list.get(i)` |
-| ES6+ 其他不支持项 | 见 [[js-api]] §ES6 兼容性 | 查表替换 |
 
 ## 性能 / 行为
 

@@ -1,0 +1,23 @@
+{
+  "skill_name": "legado-book-source",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我写一个笔趣阁的书源，网址是 https://www.biqugeso.com，需要搜索、详情、目录、正文都能用。搜索页我看了下，结果列表是 div.result-list 下面一堆 div.result-item，书名在 h3 a，作者在 p.info span.author，封面是 img.cover 的 src",
+      "expected_output": "完整的 BookSource JSON，包含正确的 searchUrl（GET 模板）、ruleSearch（bookList/name/author/bookUrl/coverUrl）、ruleBookInfo、ruleToc、ruleContent，所有选择器与实际 HTML 结构匹配",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "https://api.fpxs.io 这个网站返回的是 JSON 数据，搜索接口是 /v1/search?q=关键词，返回 {data: {list: [{id, title, author, cover, category}]}}，详情是 /v1/book/{id} 返回 {data: {title, author, summary, cover, chapters: [{id, title}]}}，正文是 /v1/chapter/{id} 返回 {data: {content}}。帮我写成阅读书源",
+      "expected_output": "完整的 BookSource JSON，searchUrl 指向 API，ruleSearch 使用 JsonPath（$.data.list[*]），bookList/bookUrl 正确处理 ID 到完整 URL 的转换，ruleBookInfo/ruleToc/ruleContent 全部使用 JsonPath",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "这个小说网站 https://www.wenxue123.com 有 CloudFlare 防护，浏览器能打开但是 curl 返回 403 和 challenges.cloudflare.com 的验证页。搜索是 GET /search.html?keyword=xxx，搜索结果在 ul.book-list > li 里。帮我写书源，要能绕过 CF 验证",
+      "expected_output": "完整的 BookSource JSON，包含 enabledCookieJar: true、浏览器 UA 的 header、loginCheckJs（CloudFlare 三层检测模板），以及正确的规则选择器",
+      "files": []
+    }
+  ]
+}

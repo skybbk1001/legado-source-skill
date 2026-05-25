@@ -1,6 +1,8 @@
 # JavaScript API 参考
 
-Legado 内嵌 Rhino JS 引擎（htmlunit-core-js），无浏览器 DOM/Window/fetch 等 API。字符串判空建议用 `String()` 包裹后再判：java 层返回的空字符串在 JS 里转布尔值为 true。
+Legado 内嵌 Rhino JS 引擎（htmlunit-core-js），无浏览器 DOM/Window/fetch 等 API，但内置Crypto-js支持。
+字符串判空建议用 `String()` 包裹后再判：java 层返回的空字符串在 js 里转布尔值为 true。
+jslib里上下文没有jsouce/java/cache/cookie全局变量，如果有函数用到这些变量，需要从调用处的this中解构，如：const { java } = this
 
 ## ES6+ 兼容性
 
@@ -122,6 +124,8 @@ java.hexEncodeToString(utf8);            // → String
 ```
 
 ### 对称加密
+
+如果网页里有可用的加解密代码，优先用网页的（阅读支持Crypto-js）
 
 ```js
 const c = java.createSymmetricCrypto("AES/CBC/PKCS5Padding", key, iv);

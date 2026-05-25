@@ -185,6 +185,7 @@ API 返回 ID 而非完整 URL 时，用 `@js:` 拼接：
 | `@js:...` | **推荐** — 可写在任意规则后，也可直接使用 | `@js:String(result).replace('a','b')` |
 | `<js>...</js>` | **推荐** — 可写在任意两个规则中 | `<js>\n(function(){\n  var x = ...;\n  return x;\n})();\n</js>` |
 | `{{...}}` | 仅 URL 内模板变量（`{{key}}`/`{{page}}`） | `https://x.com/search?q={{key}}&p={{page}}` |
+> 无浏览器 DOM/Window/fetch 等 API
 
 ```
 <js>
@@ -383,50 +384,4 @@ let opts = {"headers": {"Referer": baseUrl}};
 
 ## 8. URL 构造完整示例
 
-### 笔趣阁式典型书源（HTML 站点）
-
-```json
-{
-  "bookSourceUrl": "https://www.biquge.example",
-  "bookSourceName": "笔趣阁示例",
-  "bookSourceType": 0,
-  "enabled": true,
-  "enabledExplore": true,
-  "enabledCookieJar": true,
-  "concurrentRate": "1000",
-  "header": "{\"User-Agent\": \"Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36\"}",
-  "searchUrl": "https://www.biquge.example/search?keyword={{key}}&page={{page}}",
-  "ruleSearch": {
-    "checkKeyWord": "斗罗大陆",
-    "bookList": "div.result-list > div.result-item",
-    "name": "h3.result-item-title > a@text",
-    "author": "p.result-game-item-info-tag > span:nth-child(2)@text",
-    "bookUrl": "h3.result-item-title > a@href",
-    "coverUrl": "img.result-item-pic@src",
-    "kind": "p.result-game-item-info-tag > span:nth-child(4)@text",
-    "lastChapter": "p.result-game-item-info-tag-item > a@text"
-  },
-  "ruleBookInfo": {
-    "name": "div#info > h1@text",
-    "author": "div#info > p:nth-child(2)@text##作者：##",
-    "intro": "div#intro > p@html",
-    "coverUrl": "div#fmimg > img@src",
-    "kind": "div#info > p:nth-child(3)@text##分类：##",
-    "lastChapter": "div#info > p:nth-child(4) > a@text",
-    "tocUrl": "div#list > a@href"
-  },
-  "ruleToc": {
-    "chapterList": "div#list > dl > dd",
-    "chapterName": "a@text",
-    "chapterUrl": "a@href",
-    "nextTocUrl": "div.page_link > a:contains(下一页)@href"
-  },
-  "ruleContent": {
-    "content": "div#content@html",
-    "nextContentUrl": "div.page_link > a:contains(下一页)@href",
-    "replaceRegex": "##\\s{2,}|&nbsp;|.*记住本站.*|.*一秒记住.*"
-  }
-}
-```
-
-更多类型骨架（JSON API、登录、漫画）见 [[site-templates]]。
+完整 JSON 骨架和调整说明见 [[references/site-templates.md]]，涵盖 HTML 文本站（笔趣阁式）、JSON API 站、需登录站、漫画站四种类型。

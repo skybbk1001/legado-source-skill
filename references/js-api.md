@@ -1,12 +1,20 @@
 # JavaScript API 参考
 
 Legado 内嵌 Rhino JS 引擎（htmlunit-core-js），无浏览器 DOM/Window/fetch 等 API，但内置Crypto-js支持。
-字符串判空建议用 `String()` 包裹后再判：java 层返回的空字符串在 js 里转布尔值为 true。
-jslib里上下文没有jsouce/java/cache/cookie全局变量，如果有函数用到这些变量，需要从调用处的this中解构，如：const { java } = this
+字符串判空用 `String()` 包裹：java 返回的空字符串在 js 里转布尔值为 true。
+
+**jsLib 上下文**：无 java/cache/cookie 等全局变量，函数需要从 this 解构：
+```js
+// jsLib 中
+function getBook(url) {
+  const { java } = this;  // 必须从 this 解构
+  return java.log(url);
+}
+```
 
 ## ES6+ 兼容性
 
-Rhino 支持大部分 ES6+，但 4 项不支持。使用 ✅ 列即可：
+Rhino 支持大部分 ES6+：
 
 | ✅ 完全支持 | ❌ 不支持 | 替代方案 |
 |---|---|---|
@@ -44,20 +52,16 @@ Rhino 支持大部分 ES6+，但 4 项不支持。使用 ✅ 列即可：
 | `key` | String? | 搜索规则 + loginCheckJs（搜索外为 null） |
 | `page` | Int | 搜索/目录规则（当前页码） |
 
-> **`java` 身份说明**：规则 JS 中 `java` 是 `AnalyzeRule`。`loginCheckJs` 中 `java` 是 `AnalyzeUrl` — 可访问 `java.initUrl()`、`java.getStrResponse()`；搜索关键词用独立变量 `key`。参见下方 §loginCheckJs 上下文。
+规则 JS 中 `java` 是 `AnalyzeRule`。`loginCheckJs` 中是 `AnalyzeUrl`（可访问 `java.initUrl()` / `java.getStrResponse()`）。
 
-## 网络
+## 网络请求
 
 ```js
-// GET → String（仅 body）
-const body = java.ajax(url);
+java.ajax(urlStr): String
+java.ajaxAll(urlList: Array<String>): Array<StrResponse>
 
-// 批量 GET → Array<StrResponse>
-const results = java.ajaxAll([url1, url2]);
-// 每个: .body(), .code(), .headers()
-
-// 完全控制 → StrResponse（.body(), .code(), .message(), .headers(), .raw()）
-const res = java.connect(url);
+//返回StrResponse 方法body() code() message() headers() raw() toString() 
+java.connect(urlStr): StrResponse
 
 // GET 带请求头（不跟随跳转）→ Connection.Response
 java.get(url, { Referer: "..." });               // Map
@@ -77,30 +81,26 @@ java.post(url, body, '{"Content-Type": "..."}');
 需要 JS 执行的页面。JS 参数通过 `evaluateJavascript` 求值 — 返回值即结果。若结果为空/null，每 1 秒轮询，最多 30 秒：
 
 ```js
-// WebView 加载，执行 JS → String 结果
-const html = java.webView(null, url, "document.documentElement.outerHTML");
+// 使用webView访问网络
+// @param html 直接用webView载入的html, 如果html为空直接访问url
+// @param url html内如果有相对路径的资源不传入url访问不了
+// @param js 用来取返回值的js语句, 没有就返回整个源代码
+// @return 返回js获取的内容
+java.webView(html: String?, url: String?, js: String?): String?
 
-// CF 绕过模式（两步）：挑战还在 → null，完成后 → HTML
-const html = java.webView(null, url,
-  "(()=>{if(window._cf_chl_opt||document.querySelector('script[src*=\"challenge-platform\"]'))return null;return document.documentElement.outerHTML;})()");
+// 使用webView获取跳转url
+java.webViewGetOverrideUrl(html: String?, url: String?, js: String?, overrideUrlRegex: String): String?
 
-// CF 绕过第二步：WebView 验证通过后用 connect() + webView 获取 StrResponse
-// CookieManager 是单例，第二个 WebView 共享前一个的 cookie
-const resp = java.connect(url + ',{"webView":true}');
+// 使用webView获取资源url
+java.webViewGetSource(html: String?, url: String?, js: String?, sourceRegex: String): String?
 
-// 捕获跳转后的 URL
-const redirectUrl = java.webViewGetOverrideUrl(null, url, js, "redirect_pattern");
+// 使用内置浏览器打开链接，可用于获取验证码 手动验证网站防爬
+// @param url 要打开的链接
+// @param title 浏览器的标题
+java.startBrowser(url: String, title: String)
 
-// 捕获资源 URL
-const resourceUrl = java.webViewGetSource(null, url, js, "resource_pattern");
-```
-
-内联等效（URL 选项）：
-```
-https://example.com/page,{"webView":true,"js":"document.querySelector('#content').innerHTML"}
-```
-
-> **CF 绕过为什么用 `connect()` 而不是 `getStrResponse()`？** `java.webView()` 完成验证后 cookie 在 Android `CookieManager` 单例中，`connect(url + ',{"webView":true}')` 创建的第二个 WebView 直接共享。而 `getStrResponse()` 走 OkHttp 从 `CookieStore` 读 cookie——异步写入可能未完成。详见 `references/anti-bot.md`。
+// 使用内置浏览器打开链接，并等待网页结果 .body()获取网页内容
+java.startBrowserAwait(url: String, title: String, refetchAfterSuccess: Boolean? = true): StrResponse
 
 ## 加密
 
@@ -125,7 +125,7 @@ java.hexEncodeToString(utf8);            // → String
 
 ### 对称加密
 
-如果网页里有可用的加解密代码，优先用网页的（阅读支持Crypto-js）
+注：优先使用网页的 CryptoJS（Legado 内置）。
 
 ```js
 const c = java.createSymmetricCrypto("AES/CBC/PKCS5Padding", key, iv);
@@ -135,7 +135,7 @@ c.encryptBase64(data);     // → Base64
 c.encryptHex(data);        // → Hex
 ```
 
-`key` / `iv`：String（UTF-8）或 ByteArray（`java.hexDecodeToByteArray`）。
+`key`/`iv`：String（UTF-8）或 ByteArray。
 
 ### 非对称加密
 
@@ -230,7 +230,7 @@ cache.getFromMemory(key);
 
 ## 文件操作
 
-所有路径相对于应用缓存目录。
+路径相对于应用缓存目录。
 
 ```js
 java.downloadFile(url);              // → 本地路径
@@ -253,7 +253,7 @@ java.un7zFile(zipPath);
 java.unArchiveFile(zipPath);        // 自动检测类型
 java.getTxtInFolder(dirPath);       // 所有 .txt → String
 
-// 读取远程压缩包内容
+// 远程压缩包
 java.getZipStringContent(zipUrl, innerPath);
 java.getZipByteArrayContent(zipUrl, innerPath);
 java.getRarStringContent(zipUrl, innerPath);
@@ -283,22 +283,7 @@ java.getWebViewUA();                 // → WebView 默认 User-Agent 字符串
 
 ## loginCheckJs 上下文
 
-`loginCheckJs` 通过 `AnalyzeUrl.evalJS()` 求值（非 `AnalyzeRule.evalJS()`）。这意味着 `java` 是 `AnalyzeUrl` 实例，可访问额外方法：
-
-```js
-// 重新处理 URL（用当前 key/page 重建搜索 URL）
-java.initUrl();
-
-// 用当前设置执行 HTTP 请求 → StrResponse（.body(), .code(), .url()）
-java.getStrResponse();
-
-// 搜索关键词 — 搜索上下文中可用；书籍信息/目录/正文上下文中为 null
-key;
-```
-
-这些**仅**在 `loginCheckJs` 中可用。普通规则中 `java` 是 `AnalyzeRule`，无这些方法。
-
-`java.ruleUrl` 是解析后的规则 URL，可能仍带 `,{json}` URL 选项；需要当前实际请求地址时优先用 `java.url` 或 `result.url()`。
+`java` 是 `AnalyzeUrl`，可用 `java.initUrl()` / `java.getStrResponse()` / `key`。普通规则中是 `AnalyzeRule`，无这些方法。
 
 ## Source 与登录
 
@@ -330,7 +315,7 @@ java.reGetBook();
 
 ```js
 // 设置/获取局部变量（会话范围，规则求值后清除）
-java.setLocal("key", "value");
+java.set("key", "value");
 java.get("key");                     // 读取通过 @put: 或 setLocal 设置的变量
 ```
 

@@ -1,35 +1,49 @@
-# 反爬绕过：CloudFlare 人机验证
+# 反爬对策
 
-> **上下文**：本文件所有代码用于 `loginCheckJs`，运行在 `AnalyzeUrl.evalJS()` 中。此上下文中 `java` 是 `AnalyzeUrl` 实例，可访问 `java.initUrl()` 和 `java.getStrResponse()`；搜索关键词用独立变量 `key` 读取。详见 `references/js-api.md` §loginCheckJs 上下文。
+## 1. 检测模式（按优先级）
 
-## 检测与处理流程
+| 信号 | 反爬类型 | 对策 |
+|---|---|---|
+| `403` | IP 封禁 / 权限拒绝 | 检查 cookie/login / `concurrentRate` |
+| `401` | 未授权 | 检查 `loginUrl` / `enabledCookieJar` |
+| `429` | 频率限制 | 增大 `concurrentRate`（如 `"1000"` → `"3000"`） |
+| `challenges.cloudflare.com` / `_cf_chl_opt` | CloudFlare | CF 三层绕过（见下文） |
+| `content-length: 0` / 响应极短 | 空/异常页 | 检查请求头 / Referer / Cookie |
+| 响应中含 `验证码` / `captcha` | 验证码 | `java.ocr()` 或 `java.getVerificationCode()` |
+| 响应含加密数据 | 加密/签名 | 调网页函数抓参数 |
 
-```
-请求 URL
-  │
-  ▼
-检查响应 ──► 正常页面？ ──► 放行
-  │
-  ▼
-是否人机验证拦截？
-（响应体含 challenges.cloudflare.com 或 _cf_chl_opt）
-  │
-  ├── 是 → 第一层：WebView JS 挑战
-  │           │
-  │           ├── 成功 → java.connect(url + ',{"webView":true}')
-  │           │            共享同一个 CookieManager，cookie 直接可用
-  │           │
-  │           └── 失败 → 第二层：内置浏览器（手动）
-  │                          │
-  │                          └── 用户完成验证 → 完成
-  │
-  ▼
-放行
+## 2. 基础防护（所有站点优先尝试）
+
+```json
+{
+  "header": "{\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36\"}",
+  "enabledCookieJar": true,
+  "concurrentRate": "1000"
+}
 ```
 
-## 完整 `loginCheckJs` 模板
+- `header`：浏览器 UA 避免被识别为爬虫
+- `enabledCookieJar`：自动保存 session
+- `concurrentRate`：请求间隔（毫秒）
 
-生成书源时，检测到 CloudFlare、Turnstile 或类似验证页，使用此模板。**整段用 IIFE 包住，最后返回 `StrResponse`**，避免 Rhino 报"函数外使用 return"。
+### 常见请求头
+
+```json
+{
+  "header": "{\"User-Agent\": \"Mozilla/5.0\", \"Referer\": \"https://site.com\", \"Origin\": \"https://site.com\", \"Accept\": \"application/json\"}"
+}
+```
+
+| 头 | 用途 |
+|---|---|
+| `User-Agent` | 浏览器伪装 |
+| `Referer` | 来源检查（图片/API 常用） |
+| `Origin` | CORS 检查 |
+| `Accept` | 内容协商 |
+
+## 3. CloudFlare 三层绕过
+
+> 上下文：代码用于 `loginCheckJs`，`java` 是 `AnalyzeUrl` 实例
 
 ```js
 (() => {
@@ -37,13 +51,11 @@
   const url = String(java.url || res.url());
   const cfRe = /challenges\.cloudflare\.com|_cf_chl_opt|cf-chl|challenge-platform|Just a moment/i;
 
-  // 第一层：检测拦截
   if (cfRe.test(res.body())) {
-    // 第二层：WebView JS 挑战
     const cfProbe = `
       (() => {
         window.__legadoCfStart ??= Date.now();
-        const maxWait = 12000;
+        const maxWait = 6000;
         const blocked = window._cf_chl_opt ||
           document.querySelector('script[src*="challenge-platform"],script[src*="challenges.cloudflare.com"]');
         if (blocked && Date.now() - window.__legadoCfStart < maxWait) return null;
@@ -53,10 +65,8 @@
     const webHtml = java.webView(null, url, cfProbe);
 
     if (webHtml && !cfRe.test(String(webHtml))) {
-      // WebView 验证成功 → 用 connect() 复用 cookie（见下方原理说明）
       res = java.connect(url + ',{"webView":true}');
     } else {
-      // 第三层：内置浏览器手动验证
       cookie.removeCookie(url);
       java.toast("需要验证CloudFlare，请在浏览器中完成验证");
       if (key != null) {
@@ -71,36 +81,54 @@
 })();
 ```
 
-## 原理解释
-
-### 三层防御
-
-| 层级 | 方法 | 原理 | 适用 |
-|---|---|---|---|
-| **检测** | 正则匹配响应体 | 人机验证系统注入独有脚本（`challenges.cloudflare.com`、`_cf_chl_opt` 等） | 所有 CF 站点 |
-| **WebView 挑战** | `java.webView()` + JS 轮询 | WebView 执行 CF 的 JS 挑战，每 1 秒检查结果，最长等 12 秒 | 大多数 CF 站点 |
-| **内置浏览器** | `java.startBrowser()` / `java.startBrowserAwait()` | 用户手动完成验证，获得长期 session | WebView 失败时兜底 |
-
-### Cookie 同步竞态（为什么用 `connect()` 而不是 `getStrResponse()`）
-
-```
-WebView 的 CookieManager ──(Coroutine.async fire-and-forget)──> CookieStore DB
-                                                                    ↑
-java.getStrResponse() ──(setCookie 读取)───────────────────────────┘
-                              存在竞态：异步写入可能未完成
-```
-
-`java.webView()` 完成验证后，`cf_clearance` cookie 存在 Android `CookieManager` 单例中。`BackstageWebView` 通过 `Coroutine.async`（不等待）异步同步到 `CookieStore` DB。此时如果调用 `java.getStrResponse()`，它走 OkHttp 从 `CookieStore` 读取——异步写入可能未完成，再次被拦。
-
-**解决方案**：`java.connect(url + ',{"webView":true}')` 创建第二个 WebView，`CookieManager.getInstance()` 是进程级单例，直接共享第一个 WebView 的 cookie，无需等异步同步。
-
-### 搜索场景的特殊处理
-
-搜索场景用 `startBrowser`（非阻塞）打开浏览器后返回当前响应，用户验证完成后重试搜索；`startBrowserAwait` 会阻塞，易被搜索外层 30 秒超时取消。详情、目录、正文等非搜索场景用 `startBrowserAwait`。
-
 ### 最佳实践
 
-- 用 `source.put`/`source.get` 追踪拦截次数，反复失败跳到手动回退
-- 自动失败转手动前再清 cookie（一开始就清会删掉 `cf_clearance`）
-- 自动化重试过多会触发 IP 封禁 → 限 2 次转手动
-- WebView 在较新 CF 版本上可能失败（WebGL/字体指纹检测）
+- 搜索用 `startBrowser`（非阻塞），详情/目录/正文用 `startBrowserAwait`
+- 追踪拦截次数，限 2 次转手动
+- WebView 在新版 CF 上可能失败（WebGL/字体检测）
+
+## 4. 加密/签名请求
+
+站点对请求加密或签名时，用 Playwright 调网页函数获取参数：
+
+```js
+// 在 loginCheckJs 或规则 JS 中
+const encrypted = window.encryptData(keyword);  // 调网页加密函数
+```
+
+优先用网页的 CryptoJS（Legado 内置）：
+
+```js
+const c = java.createSymmetricCrypto("AES/CBC/PKCS5Padding", key, iv);
+c.decryptStr(data);
+```
+
+## 5. 登录站点
+
+```json
+{
+  "loginUrl": "https://site.com/login,{\"method\":\"POST\",\"body\":\"username={{username}}&password={{password}}\"}",
+  "loginUi": "[{\"name\":\"username\",\"type\":\"text\"},{\"name\":\"password\",\"type\":\"password\"}]",
+  "loginCheckJs": "(() => { let res = result; if (String(res.body()).includes('请先登录')) { source.removeLoginInfo(); java.toast('登录已过期'); } return res; })()"
+}
+```
+
+- `loginCheckJs` 检测登录状态，失效时触发重登
+
+## 6. 降级策略
+
+| 主方式 | 备用方案 | 实现方式 |
+|---|---|---|
+| JSON API | HTML 解析 | 双写 `ruleSearch` 或 JS 内分支 |
+| WebView 自动 | 手动浏览器 | `startBrowserAwait` |
+| 并发请求 | 串行 + 限流 | 增大 `concurrentRate` |
+
+## 7. 验证码
+
+```js
+// 自动识别（字母数字）
+const code = java.ocr(captchaUrl);
+
+// 手动弹窗
+const code = java.getVerificationCode(captchaUrl);
+```

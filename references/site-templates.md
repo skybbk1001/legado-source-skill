@@ -1,19 +1,17 @@
-# 站点骨架样板
+# 站点骨架
 
-按站点类型挑一个最接近的起手，再按 [[SKILL.md]] 工作流逐步实测增量。
+按类型起手，按 [[SKILL.md]] 工作流实测。
 
-四类样板：
-
-1. [HTML 文本站（笔趣阁式）](#1-html-文本站笔趣阁式)
+1. [HTML 文本站](#1-html-文本站)
 2. [JSON API 站](#2-json-api-站)
 3. [需登录站](#3-需登录站)
-4. [漫画站（图片源）](#4-漫画站图片源)
+4. [漫画站](#4-漫画站)
 
 ---
 
-## 1. HTML 文本站（笔趣阁式）
+## 1. HTML 文本站
 
-典型特征：搜索是 GET，返回 HTML 列表；详情、目录、正文都是 HTML 页面。
+搜索 GET，返回 HTML 列表；详情/目录/正文都是 HTML。
 
 ```json
 {
@@ -73,7 +71,7 @@
 
 ## 2. JSON API 站
 
-典型特征：Playwright Network 看到 XHR 返回 JSON。比 HTML 反爬弱、字段干净。
+XHR 返回 JSON，反爬弱。
 
 ```json
 {
@@ -122,13 +120,13 @@
 }
 ```
 
-> **更好的写法**：`bookList` 用 `<js>` 块拼好完整对象（带完整 URL），字段全用 `$.bookUrl` / `$.coverUrl` 直读，避免每个字段写 `@js:` 拼接。见 [[references/rule-syntax.md]] §bookList 进阶。
+`bookList` 用 JS 拼好对象，字段用 `$.xxx` 直读。
 
 ---
 
 ## 3. 需登录站
 
-典型特征：搜索/详情/正文需登录 cookie。`loginUi` 写表单，`loginCheckJs` 每次请求后验证。
+需登录 cookie。`loginUi` 写表单，`loginCheckJs` 验证。
 
 ```json
 {
@@ -155,17 +153,17 @@
 ```
 
 要点：
-- `loginUi` 是 JSON 字符串数组（不是 JSON 对象），定义表单字段。完整字段类型见 BaseSource 源码
-- `loginCheckJs` 是 IIFE，必须 `return res`（StrResponse 类型）
-- 触发重登：`source.removeLoginInfo()` + `java.toast` 提示
+- `loginUi` 是 JSON 字符串数组
+- `loginCheckJs` 必须返回 `StrResponse`
+- 重登：`source.removeLoginInfo()` + `java.toast`
 
-CloudFlare 站点的 `loginCheckJs` 模板见 [[references/anti-bot.md]]。
+CF 模板见 [[references/anti-bot.md]]。
 
 ---
 
-## 4. 漫画站（图片源）
+## 4. 漫画站
 
-典型特征：`bookSourceType: 2`，正文是 `<img>` 标签序列，每张图可能需 Referer。
+`bookSourceType: 2`，正文是 `<img>` 序列。
 
 ```json
 {
@@ -206,18 +204,11 @@ CloudFlare 站点的 `loginCheckJs` 模板见 [[references/anti-bot.md]]。
 ```
 
 要点：
-- 正文构造 `<img>` 标签序列。每张图 URL 后拼 `,{"headers":{"Referer":"..."}}` 自带请求头
-- 加密图片：用 `imageDecode` 字段写 AES/XOR 解密 JS，见 [[references/js-api.md]] §AES/XOR 图片解密
-- 字体反爬不适用（漫画无文本）
+- 正文构造 `<img>` 序列，URL 后拼 `,{"headers":{"Referer":"..."}}`
+- 加密图片用 `imageDecode`，见 [[references/js-api.md]]
 
 ---
 
-## 关于"发现"页（`exploreUrl`）
+## 发现页（`exploreUrl`）
 
-四类骨架都可加发现页。`exploreUrl` 格式 `分类名::URL`，一行一条：
-
-```
-"exploreUrl": "玄幻::https://www.example.com/category/xuanhuan?page={{page}}\n都市::https://www.example.com/category/dushi?page={{page}}\n完结::https://www.example.com/finished?page={{page}}"
-```
-
-`ruleExplore` 与 `ruleSearch` 结构相同（`bookList`、`name`、`author`、`bookUrl` 等）。**如果与 `ruleSearch` 完全一致，可省略 `ruleExplore`**；只要有一项不同，就必须写完整。
+格式 `分类名::URL`，一行一条。`ruleExplore` 与 `ruleSearch` 结构相同（一致则省略）。

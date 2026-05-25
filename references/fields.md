@@ -1,6 +1,6 @@
 # 字段速查
 
-完整字段清单。SKILL.md 给出顶层框架后，写每类规则时来这里查具体字段名和示例。
+完整字段清单。
 
 ## BookSource 顶层
 
@@ -15,7 +15,7 @@
 | `header` |  | 全局请求头 JSON 字符串 |
 | `concurrentRate` |  | 请求间隔，直接写毫秒数：`"1000"`=每次请求间隔 ≥1s。`"N/M"` 格式仅在 N>1 时使用（如 `"3/1000"`=每 1 秒最多 3 次）。**不要写 `"1/1000"`**，等同于 `"1000"` |
 | `bookUrlPattern` |  | 详情页 URL 正则（外部链接识别） |
-| `jsLib` |  | 共享 JS 库（多规则复用函数） |
+| `jsLib` |  | 共享 JS 库（多规则复用函数），**无 java/cache/cookie 等全局变量，用 this 解构** |
 | `loginUrl` / `loginUi` / `loginCheckJs` |  | 登录三件套，见 [[references/anti-bot.md]] |
 | `coverDecodeJs` |  | 封面解密 JS |
 | `eventListener` + `customButton` |  | 事件回调，见 [[references/js-api.md]] §callBackJs |
@@ -42,7 +42,7 @@
 
 `searchUrl` 模板：`{{key}}` 自动 URL 编码，`{{page}}` 页码递增。
 
-`bookList` 必须返回 N 个元素 = N 条结果。字段规则只在每个元素子树内搜，且只取首个匹配。详见 [[references/rule-syntax.md]] §bookList 约束。
+`bookList` 返回 N 个元素 = N 条结果，字段在每个元素内执行。
 
 ## 详情 `ruleBookInfo`
 
@@ -63,7 +63,7 @@
 }
 ```
 
-- `init` 是预处理 JS，**必须返回 result**（否则后续字段拿不到内容）
+- `init` 必须返回 `result`
 - `tocUrl` 仅当目录在独立页面时需要
 
 ## 目录 `ruleToc`
@@ -83,7 +83,7 @@
 }
 ```
 
-`preUpdateJs` 可调用 `java.refreshTocUrl()` / `java.reGetBook()`（仅此上下文可用，见 [[references/js-api.md]]）。
+`preUpdateJs` 可调用 `java.refreshTocUrl()` / `java.reGetBook()`。
 
 ## 正文 `ruleContent`
 
@@ -101,15 +101,10 @@
 }
 ```
 
-- 正文用 `@html`，保留段落结构；`@text` 会丢换行
-- 漫画源输出 `<img src="...">` 标签序列
-- `replaceRegex`：以 `##` 开头，后接一条正则；多个替换模式用 `|`（正则的"或"）合并到同一条正则里，统一替换为空。详细机制见 [[references/rule-syntax.md]] §replaceRegex
+- 正文用 `@html`，`@text` 会丢换行
+- 漫画源输出 `<img src="...">` 序列
+- `replaceRegex`：`##正则##替换`，多个模式用 `|` 合并
 
 ## 翻页字段
 
-`nextTocUrl`（目录翻页）和 `nextContentUrl`（正文翻页）机制一致：
-
-- 选择器返回非空 URL → 继续翻页；返回空 → 停止
-- 可返回列表，Legado 自动去重
-- 末页选择器必须返回空，否则 App 死循环
-- 验证方法：用 Playwright 打开非末页和末页两种章节各跑一遍，确认非末页有 URL、末页空
+`nextTocUrl`/`nextContentUrl`：返回非空继续，空则停止。末页必须返回空否则死循环。

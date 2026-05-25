@@ -17,11 +17,9 @@ a[href$=.html]                   → href 以 .html 结尾
 a[href~=regex]                  → (JSoup特有) href 属性值匹配正则表达式（例：a[href~=(?i)chapter]）
 ```
 
-### 索引（按位置筛选）
+### 索引
 
-Legado 在 JSoup 之上提供了自己的索引语法糖，**在规则被送入 JSoup 之前预处理**。索引从 0 开始。
-
-**Legado 索引语法（推荐）**：
+Legado 索引（推荐）：
 
 ```
 div.item.0              → 第 1 个 div.item（全局结果）
@@ -33,7 +31,6 @@ div.item[0:5]           → 前 5 个（索引 0~4）
 div.item[3:]            → 第 4 个起
 ```
 
-> **注意**：`:` 在 Legado 中只是分隔符。筛选索引用 `.数字`（如 `div.item.0`）。`div.item:1` 会原样传给 JSoup，不会按索引筛选。
 
 **JSoup 原生索引**（基于同级兄弟位置）：
 
@@ -49,24 +46,22 @@ div.item:gt(2)          → 父元素下排第 4 个起的 div.item
 ### 文本匹配
 
 ```
-a:contains(下一页)               → 文本含"下一页"的 <a>
-div:matches(第\d+章)             → 文本匹配正则的 <div>
-p:containsOwn(作者)              → 自身文本（不含子元素文本）含"作者"
+a:contains(下一页)               → 文本含"下一页"
+div:matches(第\d+章)             → 匹配正则
+p:containsOwn(作者)              → 自身文本（不含子元素）
 ```
 
 ### 结构伪类
 
 ```
-div.item:first-child             → 父元素的首个子元素
-div.item:last-child              → 父元素的末个子元素
-div.item:nth-child(3)            → 父元素的第 3 个子元素（标准 CSS 规范，从 1 开始计）
-div.item:nth-child(2n+1)         → 父元素的奇数子元素
-div:has(img)                     → 包含 <img> 的元素
-div:has(a[href])                 → 包含带 href 的 <a> 的元素
-div.item:not(.ad)                → 不含 class "ad" 的 .item
+div.item:first-child             → 首个子元素
+div.item:last-child              → 末个子元素
+div.item:nth-child(3)            → 第 3 个子元素
+div:has(img)                     → 包含 <img>
+div.item:not(.ad)                → 不含 class "ad"
 ```
 
-> `:has()` 和 `:not()` 可嵌套：`li:has(a:contains(连载))` — 包含文本"连载"的链接的 li。
+`:has()` 和 `:not()` 可嵌套。
 
 ### 属性与内容提取
 
@@ -91,15 +86,9 @@ img@src                 → "https://example.com/cover.jpg"
 div#content@html        → "<p>第一章...</p><p>第二章...</p>"
 ```
 
-### 关键：`bookList` / `chapterList` 约束
+### bookList/chapterList 约束
 
-`bookList`（搜索）和 `chapterList`（目录）选择器决定**返回多少条结果**。Legado 引擎工作方式：
-
-1. `getElements(bookList)` → 将页面切为 N 个元素
-2. 对**每个**元素依次执行其他字段规则（`name`、`author`、`bookUrl`…）
-3. `getString(rule)` 在每个元素内只返回**第一个**匹配
-
-**结论：** `bookList` 必须返回**每个结果一个元素**。字段选择器只能访问该元素的**子元素**，无法跨越到兄弟元素。
+`bookList`/`chapterList` 返回 N 个元素 = N 条结果。字段规则在每个元素内执行，只取首个匹配，无法跨越到兄弟元素。
 
 ```
 bookList: "ul.list > li"          → N 个 <li> = N 条结果
@@ -147,7 +136,7 @@ books;
 "updateTime": "$.updateTime"
 ```
 
-`<js>` 块返回 JS 对象数组 → Legado 的 `getElements` 将 `NativeArray` 展开为 `List<NativeObject>` → `setContent(item)` 将每个对象放入上下文 → `$.xxx` 以 JsonPath 模式读取属性。
+`<js>` 返回对象数组 → 字段用 `$.xxx` 读取。
 
 ## 2. JsonPath（JSON API）
 
@@ -174,7 +163,7 @@ API 返回 ID 而非完整 URL 时，用 `@js:` 拼接：
 
 `@js:` 中的 `result` 是 JsonPath 提取到的原始值（如 ID 字符串），直接拼接即可。
 
-> **更好的做法**：如果 `bookList` 已经是 JS 构建的 NativeObject 数组，直接在 JS 里拼好完整 URL（对象里加 `bookUrl`、`coverUrl` 等字段），规则用 `$.bookUrl` / `$.coverUrl` 直读。完全不需要在字段规则里写 `@js:` 或 `{{}}`。
+`bookList` 已是 JS 数组时，直接在 JS 里拼好完整 URL，字段用 `$.bookUrl` 直读。
 
 ## 3. 规则中的 JavaScript
 
@@ -185,7 +174,7 @@ API 返回 ID 而非完整 URL 时，用 `@js:` 拼接：
 | `@js:...` | **推荐** — 可写在任意规则后，也可直接使用 | `@js:String(result).replace('a','b')` |
 | `<js>...</js>` | **推荐** — 可写在任意两个规则中 | `<js>\n(function(){\n  var x = ...;\n  return x;\n})();\n</js>` |
 | `{{...}}` | 仅 URL 内模板变量（`{{key}}`/`{{page}}`） | `https://x.com/search?q={{key}}&p={{page}}` |
-> 无浏览器 DOM/Window/fetch 等 API
+> 无 DOM/Window/fetch 等 API
 
 ```
 <js>
@@ -215,8 +204,6 @@ CSS/JsonPath 表达不了时用 JS：
 
 ## 4. 运算符
 
-规则按运算符拆分（从左到右，惰性求值）：
-
 ### `&&` — 并集
 
 收集所有分支的结果：
@@ -244,42 +231,27 @@ div.name@text%%div.author@text%%div.time@text
 ```
 → result[0] = (name0, author0, time0)，result[1] = (name1, author1, time1)…
 
-搜索/目录中不同字段来自 DOM 不同位置、需要重新对齐时最有用。
+搜索/目录中字段需重新对齐时使用。
 
 ### `##` — 正则替换
 
-在任意规则后追加 `##pattern##replacement` 对结果做后处理：
-
 ```
-div.title@text##\s+##                     → 去掉所有空白
-div.time@text##发布时间：(.*)##$1           → 提取捕获组
-div.author@text##作者：##                   → 去掉前缀
+div.title@text##\s+##
+div.time@text##发布时间：(.*)##$1
+div.author@text##作者：##
 ```
 
-语法：`rule##pattern##replacement`
-
-- 默认：替换**所有**匹配 `pattern` 的地方为 `replacement`
-- **提取首个匹配**：末尾加 `###`（三个 `#`）→ `rule##pattern##replacement###`。只返回第一个匹配并对其做替换（提取模式）
-
-`##` 不可链式调用 — `ruleStr.split("##")[0]` 是实际规则，`[1]` 是正则，`[2]` 是替换值。如果替换值本身含 `##`，split 结果会出乎意料。
+- 默认替换所有匹配
+- 末尾加 `###` → 只替换首个
 
 ### 变量存储：`@put:` 和 `@get:`
 
-从解析内容中存取值，供后续规则使用：
-
 ```
-@put:{varName:"ruleString",varName2:"ruleString2"}规则文本
-```
-
-- `@put:{...}` 在规则求值前被剥离
-- 每个键值对：键为变量名，值为在当前上下文中求值的规则字符串
-- 后续规则中用 `@get:{varName}` 内联读取：
-
-```
-div.title@@get:{storedVar}::after
+@put:{varName:"rule"}规则文本
+div.title@@get:{var}::after
 ```
 
-变量作用域限于当前分析会话（书籍信息、目录、正文）。适合提前抓取数据，在后续选择器中复用。
+作用域限于当前分析会话。
 
 ## 5. URL 构造
 
@@ -289,43 +261,17 @@ div.title@@get:{storedVar}::after
 https://www.example.com/search?keyword={{key}}&page={{page}}
 ```
 
-`{{key}}` 自动 URL 编码。`{{page}}` 随搜索翻页递增。
+`{{key}}` 自动 URL 编码。
 
 ### URL 选项
-
-在任何 URL 后追加 `,{json}` 设置请求参数：
 
 ```
 https://example.com/api,{"method":"POST","body":"q=搜索","headers":{"X-Key":"v"},"timeout":5000}
 ```
 
-完整选项：
-
-```json
-{
-  "method": "GET",            // HTTP 方法
-  "body": "a=1&b=2",          // 请求体
-  "headers": {                // 额外请求头
-    "User-Agent": "...",
-    "Referer": "..."
-  },
-  "webView": true,            // WebView 加载（JS 渲染页面）
-  "timeout": 5000,            // 超时毫秒，不设时走全局：connect 15s、read 60s
-  "retry": 1,                 // 失败自动重试次数
-  "followRedirects": false,   // 不跟随跳转，捕获重定向地址
-  "resolveIp": "1.2.3.4",     // 覆盖 DNS 解析
-  "js": "java.headerMap.put('X-Token','v')"  // 请求前执行的 JS
-}
-```
-
-常见示例 — POST 表单搜索：
-```
-https://x.com/search,{"method":"POST","body":"keyword={{key}}","headers":{"Content-Type":"application/x-www-form-urlencoded"}}
-```
+选项：`method` `body` `headers` `webView` `timeout` `retry` `followRedirects` `resolveIp` `js`
 
 ### 图片请求头
-
-图片也可通过 URL 选项携带自己的请求头：
 
 ```js
 let opts = {"headers": {"Referer": baseUrl}};
@@ -360,28 +306,20 @@ let opts = {"headers": {"Referer": baseUrl}};
 ##(<p[^>]*>)|(</p>)##\n                → 把 <p>/</p> 换成换行
 ```
 
-### 使用要点
+执行时输入已是纯文本。非标准标签需加到 `|` 列表。
 
-- 执行时输入已是纯文本（HTML 由 `@html` 转换处理）— 针对的是文本噪声，不是 HTML 标签
-- 非标准标签（`<amp-img>`、`<mip-*>`）转换器可能按字面残留 → 加 `|</?amp-[^>]*>|</?mip-[^>]*>` 到 `|` 列表
-- 逐步编写 — 先看正文输出，再针对实际噪声补 alternatives
-
-### 规则内 `##` 语法（不同位置，同一套语法）
+### `##` 语法对照
 
 | 位置 | 形式 | 行为 |
 |---|---|---|
-| **选择器规则后缀** | `选择器##pattern##replacement` | 对提取值做正则替换 |
-| **末尾再加一个 `#`** | `选择器##pattern##replacement###` | 只替换首个匹配（提取模式） |
-| **`replaceRegex` 字段** | `##pattern##replacement` | 同上语法，但**规则本体段为空** = 对整段输入替换；replacement 通常省 |
+| 规则后缀 | `选择器##p##r` | 对提取值替换 |
+| 后缀+`###` | `选择器##p##r###` | 只替换首个 |
+| `replaceRegex` | `##p##r` | 对整段输入替换 |
 
-## 7. 其他模式（简述）
+## 7. 其他模式
 
-存在但几乎不该用：
+`//` 或 `@XPath:` 触发 XPath，`:` 前缀触发 Regex 列表。极少用。
 
-**XPath** — 规则以 `//` 或 `@XPath:` 开头时触发。适合基于文本的选择（`text()='作者'`）或兄弟元素遍历。但 CSS 选择器能处理绝大多数场景，剩下由 JS 兜底。
+## 8. 站点模板
 
-**Regex 列表模式** — 列表规则（`bookList`、`chapterList`）以 `:` 前缀触发。用正则捕获组从原始 HTML 提取列表项。CSS 选择器几乎总是更好的选择。
-
-## 8. URL 构造完整示例
-
-完整 JSON 骨架和调整说明见 [[references/site-templates.md]]，涵盖 HTML 文本站（笔趣阁式）、JSON API 站、需登录站、漫画站四种类型。
+完整骨架见 [[references/site-templates.md]]。

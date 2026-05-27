@@ -8,6 +8,7 @@
 | `401` | 未授权 | 检查 `loginUrl` / `enabledCookieJar` |
 | `429` | 频率限制 | 增大 `concurrentRate`（如 `"1000"` → `"3000"`） |
 | `challenges.cloudflare.com` / `_cf_chl_opt` | CloudFlare | CF 三层绕过（见下文） |
+| 响应 <200字节 + 仅含 `<script>` | JS 挑战页 | loginCheckJs 或 webView 模式（见下文） |
 | `content-length: 0` / 响应极短 | 空/异常页 | 检查请求头 / Referer / Cookie |
 | 响应中含 `验证码` / `captcha` | 验证码 | `java.ocr()` 或 `java.getVerificationCode()` |
 | 响应含加密数据 | 加密/签名 | 调网页函数抓参数 |
@@ -87,23 +88,76 @@
 - 追踪拦截次数，限 2 次转手动
 - WebView 在新版 CF 上可能失败（WebGL/字体检测）
 
-## 4. 加密/签名请求
+## 4. JS 挑战页
 
-站点对请求加密或签名时，用 Playwright 调网页函数获取参数：
+站点返回JS质询/挑战，页面仅含一个 `<script>` 做浏览器指纹探测，curl 拿不到真实内容。
+
+### 方案 A：loginCheckJs 全局拦截
+
+所有请求都会过 `loginCheckJs`，检测到挑战页就用 WebView 拿 cookie 再重试：
 
 ```js
-// 在 loginCheckJs 或规则 JS 中
-const encrypted = window.encryptData(keyword);  // 调网页加密函数
+(() => {
+  let res = result;
+  // 检测挑战页标记（根据目标站点调整）
+  if (/挑战页特征标记/.test(res.body())) {
+    java.initUrl();                                       // 重置请求上下文
+    java.webView(null, java.ruleUrl, "document.cookie");  // WebView 通过挑战，拿 cookie
+    result = java.getStrResponse();                       // 带 cookie 重新请求
+  }
+  return result;
+})();
 ```
 
-优先用网页的 CryptoJS（Legado 内置）：
+- 通用性强，所有请求（搜索/详情/目录/正文）都能自动处理
+- `java.initUrl()` + `java.getStrResponse()` 仅在 `loginCheckJs` 中可用（`java` 是 `AnalyzeUrl`）
+
+### 方案 B：webView 模式
+
+URL 加 `webView:true` 参数，直接走 WebView 发请求：
+
+```json
+{
+  "searchUrl": "https://site.com/search?q={{key}}&page={{page}},{\"webView\":true}"
+}
+```
+
+- 最简方案，零代码
+
+### 选择建议
+
+| 场景 | 推荐 |
+|---|---|
+| 单页需要绕过 | 方案 B |
+| 多个环节都遇到挑战页 | 方案 A |
+| 挑战页有复杂验证（如滑块） | 方案 A + `startBrowserAwait` 手动验证 |
+
+## 5. 加密/签名请求
+
+**场景 A：网页有加密函数** — 用 WebView 调网页自己的 JS 函数获取加密参数：
 
 ```js
+// 通过 webView 执行网页JS，调用其加密函数
+const encrypted = java.webView(null, url, "window.encryptData('" + keyword + "')");
+```
+
+**场景 B：需要在 Legado 内加解密** — 用 Legado 内置 API 处理网页返回的加密数据：
+
+```js
+// 对称加密（AES/DES/Blowfish）
 const c = java.createSymmetricCrypto("AES/CBC/PKCS5Padding", key, iv);
-c.decryptStr(data);
+c.decryptStr(data);        // 解密 → String
+c.encryptHex(data);        // 加密 → Hex
+
+// 哈希
+java.md5Encode(str);       // MD5
+java.digestHex(data, "SHA-256");  // SHA-256
+java.HMacHex(data, "HmacSHA256", key);  // HMAC
 ```
 
-## 5. 登录站点
+详见 [[js-api.md]] §加密。
+
+## 6. 登录站点
 
 ```json
 {
@@ -115,7 +169,7 @@ c.decryptStr(data);
 
 - `loginCheckJs` 检测登录状态，失效时触发重登
 
-## 6. 降级策略
+## 7. 降级策略
 
 | 主方式 | 备用方案 | 实现方式 |
 |---|---|---|
@@ -123,7 +177,7 @@ c.decryptStr(data);
 | WebView 自动 | 手动浏览器 | `startBrowserAwait` |
 | 并发请求 | 串行 + 限流 | 增大 `concurrentRate` |
 
-## 7. 验证码
+## 8. 验证码
 
 ```js
 // 自动识别（字母数字）

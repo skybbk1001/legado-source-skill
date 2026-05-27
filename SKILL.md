@@ -1,7 +1,7 @@
 ---
 name: legado-book-source
 description: >
-  为 Legado（阅读）编写和调试书源 JSON。触发词：写书源、创建书源、调试书源、
+  为开源阅读 Legado 编写和调试书源 JSON。触发词：写书源、创建书源、调试书源、
   书源规则、legado source。用户提到网站爬取、章节获取、HTML/JSON转书源时也使用。
 user-invokable: true
 argument-hint: "[站点URL或描述]"
@@ -11,7 +11,7 @@ argument-hint: "[站点URL或描述]"
 
 ## 角色分工
 
-AI：使用curl、Playwright MCP（DOM、Network XHR）、WebFetch、读文件等方法分析网站并制作书源。
+AI：使用curl、Playwright MCP（DOM、Network XHR）、Nodejs、读文件等方法分析网站并制作书源。
 
 用户：导入 JSON 到 App 实测，反馈现象（截图、报错、章节缺失）。
 
@@ -23,78 +23,131 @@ AI：使用curl、Playwright MCP（DOM、Network XHR）、WebFetch、读文件�
 
 ## 工作流
 
-### 1. 反爬识别（前置）
+按逆向工程标准流程分阶段执行，每阶段有验证门，不通过不进入下一阶段。各阶段保存文件到当前工作目录的 `tmp/` 子目录（不存在则创建）。
 
-工作流每一步都进行反爬检测
+### Phase 1: 侦察
+
+**目标：** 搞清站点技术架构和反爬级别。
+
+1. curl 请求首页，检测响应：
+   - 正常 HTML → 保存 `tmp/home.html`，记录 L0
+   - 被拦 → 按下方阶梯逐级升级直到拿到 HTML
+2. 从 HTML 识别：技术栈（纯 HTML / SPA / SSR+CSR）、域名关系、加密库引用
+3. 识别入口：搜索表单/URL、分类导航、发现页
+
+#### 反爬升级阶梯
+
+优先 curl + 请求头，无效才上 Playwright。拿到正常 HTML 即停。
+
+| Level | 采集方式 | 触发特征 |
+|-------|----------|----------|
+| **L0** | curl（仅 UA） | 正常 HTML |
+| **L1** | curl + `Referer` | L0 遇 CF/403/空响应 |
+| **L2** | Playwright 后台无头 | L1 后仍见 `challenges.cloudflare.com`、`Just a moment` |
+| **L3** | Playwright 可见浏览器 | L2 后仍见 Turnstile、滑块 |
+
+记录每个端点生效的 Level（不同端点可能不同，如搜索 L1 + 正文 L0）。书源配置映射见 Phase 5。
+
+**验证门：** 首页 HTML 可获取 → 记录 Level，进入 Phase 2。L3 仍失败 → 站点不可用，终止。
+
+---
+
+### Phase 2: 数据采集
+
+**目标：** 获取每个数据入口的 HTML/JSON 响应，保存供分析。
+
+默认用 Phase 1 的 Level（curl）执行，单步被拦才对该步升级。每种翻页至少验证 2 页。
+
+| 步骤 | 操作 | 保存 |
+|------|------|------|
+| 搜索 | 输入关键词搜索 | tmp/search.html |
+| 搜索翻页 | 第2、3页 | tmp/search_p2.html, tmp/search_p3.html |
+| 详情 | 点击一本书 | tmp/detail.html |
+| 目录 | 进入目录页 | tmp/catalog.html |
+| 目录翻页 | 目录第2、3页 | tmp/catalog_p2.html, tmp/catalog_p3.html |
+| 正文 | 打开一个章节 | tmp/content.html |
+| 正文翻页 | 正文第2、3页 | tmp/content_p2.html, tmp/content_p3.html |
+
+每步保存后追加 `tmp/notes.md`：URL 模板、HTTP 方法、反爬级别、翻页参数规律、选择器线索、加密/签名/重定向备注。
+
+**验证门：** 每个 HTML 含有效数据（非空/非报错/非挑战页）？是 → Phase 3。否 → 对该端点升级反爬级别重试。
+
+---
+
+### Phase 3: 静态分析
+
+**目标：** 逆向数据流，确定输入→输出映射和选择器。
+
+从 Phase 2 的 HTML 和 `tmp/notes.md` 分析，每个环节回答：输入是什么 → 怎么取（选择器/JS）→ 输出是什么。
+
+| 环节 | 输入 | 输出 | 分析来源 |
+|------|------|------|----------|
+| 搜索 | keyword | bookUrl 列表 | tmp/search.html |
+| 搜索翻页 | 第1页 | page 参数规律 | search.html → search_p2.html → search_p3.html |
+| 详情 | bookUrl | tocUrl + 元数据 | tmp/detail.html |
+| 目录 | tocUrl | chapterUrl 列表 | tmp/catalog.html |
+| 目录翻页 | 第1页 | nextTocUrl 规律 | catalog.html → catalog_p2.html → catalog_p3.html |
+| 正文 | chapterUrl | content 文本 | tmp/content.html |
+| 正文翻页 | 第1页 | nextContentUrl 规律 | content.html → content_p2.html → content_p3.html |
+| 发现 | 分类URL | bookUrl 列表 | tmp/home.html |
+
+验证选择器唯一性，分析 URL 加密/解密逻辑，确认翻页参数规律一致。
+
+**验证门：** 数据流可追溯 → Phase 4。有缺口 → 回对应 HTML 补充分析。
+
+---
+
+### Phase 4: 脚本验证
+
+**目标：** 用 Node.js 脚本验证分析结果，确保选择器和加密逻辑正确，再写书源。
+
+编写 `tmp/verify.js`，逐环节发请求验证。使用 fetch + cheerio（crypto-js 如需），每步间隔 2s 避免风控。Phase 3 的分析结果填入配置对象。
+
+| 环节 | 验证点 |
+|------|--------|
+| 搜索 | URL 正确、选择器匹配、结果非空 |
+| 搜索翻页 | page 参数生效、翻页后结果不同 |
+| 详情 | 可访问、元数据/tocUrl 可提取 |
+| 目录 | 可访问、章节列表非空 |
+| 目录翻页 | nextTocUrl 规律一致、翻页后章节不同 |
+| 正文 | 可访问、正文非空无乱码 |
+| 正文翻页 | nextContentUrl 规律一致、翻页后内容不同 |
+| 加解密 | 函数输出与浏览器一致（如有） |
+
 ```bash
-# 检查清单
-[ ] HTTP 状态是否正常（200）
-[ ] 响应是否为 HTML/JSON（非 JS 挑战页）
-[ ] 是否需要特定请求头（Referer/Origin）
-[ ] 是否需要 Cookie/session
-[ ] 是否有频率限制（多次请求测试）
-[ ] Cloudflare/其他 WAF 是否存在
+node tmp/verify.js
+```
+全部 PASS → Phase 5。有 FAIL → 回 Phase 3 修正。
+
+---
+
+### Phase 5: 开始写源
+
+**目标：** 按 Phase 3 的数据流图和 Phase 4 的验证结果写源。
+
+**反爬：** 按 Phase 1/2 记录的 Level 查 [[references/anti-bot.md]] 配置对应字段（L0=仅 UA、L1=+Referer+CookieJar、L2=+webView、L3=+startBrowserAwait）。
+
+从 [[references/fields.md]] 预填充字段，写源过程中查看 [[references/rule-syntax.md]] 和 [[references/js-api.md]]。按数据流顺序实现：
+1. 基础字段（bookSourceUrl, header, enabledCookieJar 等）
+2. 搜索（searchUrl + ruleSearch，含翻页）
+3. 详情（ruleBookInfo）
+4. 目录（ruleToc，含翻页）
+5. 正文（ruleContent，含翻页）
+6. 发现（exploreUrl + ruleExplore）
+
+---
+
+### Phase 6: 交叉验证
+
+**目标：** 检查书源 JSON 的结构、JS 语法和字段名合法性。
+
+```bash
+node scripts/validate-booksource.js path/to/booksource.json
 ```
 
-命中反爬 → 按 [[references/anti-bot.md]] 配置：
-- Cookie: `enabledCookieJar: true` + 浏览器 UA `header`
-- CF: `loginCheckJs` 模板
+脚本检查：必填字段是否缺失、`@js:` / `<js>` 块用 `vm.Script` 原样编译（与 Legado 一致）是否有语法错误、字段名是否在 [[references/fields.md]] 合法范围内。
 
-### 2. 加载首页HTML
-使用curl请求网站首页HTML，保存到tmp/home.html文件供后续使用
-
-### 3. 分析搜索请求
-从tmp/home.html中分析搜索请求的路径、方法、参数，使用curl进行验证，搜索结果的HTML里出现关键词相关的书籍列表视为成功，成功后保存curl命令到tmp/search.cu，保存HTML到tmp/search.html。如果搜索请求地址为动态生成，成功后保存请求构建流程到tmp/search.md
-
-### 4. 分析详情请求
-从tmp/search.html中提取书籍详情地址，使用curl进行验证，详情结果的HTML里出现该书详情信息视为成功，成功后保存curl命令到tmp/detail.cu，保存HTML到tmp/detail.html
-
-### 5. 分析目录请求
-从tmp/detail.html中提取书籍目录地址，使用curl进行验证，目录结果的HTML里出现该书目录信息视为成功，成功后保存curl命令到tmp/catalog.cu，保存HTML到tmp/catalog.html。之后继续分析目录分页请求，成功后保存curl命令到tmp/catalog2.cu
-
-### 6. 分析正文请求
-从tmp/catalog.html中提取章节地址，使用curl进行验证，出现完整正文视为成功，成功后保存curl命令到tmp/content.cu，保存HTML到tmp/content.html。之后继续分析正文分页请求，成功后保存curl命令到tmp/content2.cu
-
-### 7. 分析分类请求
-从tmp/home.html中分析网站书籍分类，使用curl进行验证，出现相关书籍列表视为成功，成功后保存curl命令到tmp/Discover.cu，保存HTML到tmp/Discover.html
-
-### 7. 开始写源
-创建xxxx_bookSource.json，从字段文档[[references/fields.md]]中预填充所有字段。写源过程中可随时查看规则文档[[references/rule-syntax.md]]和js文档[[references/js-api.md]]
-
-#### 7.1 基础字段
-其中header全局请求头字段中，可省略User-Agent，有应用级别的全局UA做兜底，只在需要特定UA时才主动添加。
-```json
-{
-  "bookSourceUrl": "https://site.com",
-  "bookSourceName": "站点名",
-  "bookSourceType": 0,
-  "header": "{\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36\"}",
-  "enabledCookieJar": true,  // Cookie 站点必需
-  "concurrentRate": "1000"
-}
-```
-
-#### 7.2 搜索规则
-`searchUrl` + `ruleSearch`
-从tmp/search.cu和tmp/search.md中获取刚刚分析的搜索请求方法；从tmp/search.html中获取书籍列表结构字段，从tmp/detail.cu中获取构建书籍详情URL的方法
-
-#### 7.3 详情规则（可选）
-`ruleBookInfo`
-从tmp/detail.html中获取书籍详情字段，从tmp/catalog.cu中获取构建书籍目录URL的方法
-
-#### 7.4 目录规则
-`ruleToc`
-从tmp/catalog.html中获取目录列表结构字段，从tmp/content.cu中获取正文URL构建方法，从tmp/catalog2.cu中获取目录下一页URL的构建方法
-
-#### 7.5 正文规则
-`ruleContent`
-从tmp/content.cu中获取正文字段
-
-#### 7.6 发现规则
-从tmp/home.html中获取分类字段和url，从tmp/Discover.cu获取url构建方法，从tmp/Discover.html获取书籍列表字段
-
-#### 7.6 交付验证
-运行 `python scripts/validate-booksource.py`检查书源并修复所有报错和警告，无问题后交付书源
+全部通过 → 交付书源，清理 `tmp/`。有报错 → 修正后重跑。
 
 
 ## 实现选择（按场景跳转）
@@ -109,6 +162,6 @@ AI：使用curl、Playwright MCP（DOM、Network XHR）、WebFetch、读文件�
 | 列表项数据跨兄弟元素（如 `<dt>/<dd>`） | JS bookList 拼 NativeObject 数组，字段用 `$.xxx` 直读 | [[references/rule-syntax.md]] §bookList/chapterList 约束 |
 | API 返回 ID 拼 URL | bookList 用 JS 拼好完整 `bookUrl`，字段用 `$.bookUrl` | [[references/rule-syntax.md]] §JsonPath |
 | 阅读专属JS变量与函数 | — | [[references/js-api.md]] |
-| 拿到 CF 验证页、403、需手动登录 | — | [[references/anti-bot.md]] |
+| 拿到 CF 验证页、JS 挑战页、403、需手动登录 | — | [[references/anti-bot.md]] |
 | 用户反馈：搜索空 / 字段空 / 死循环 / 乱码 / 图片不显示 | — | [[references/debugging.md]] |
 | 找具体站点类型起手骨架（HTML网页、JSON API、登录、漫画） | — | [[references/site-templates.md]] |

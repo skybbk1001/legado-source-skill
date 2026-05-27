@@ -1,0 +1,343 @@
+#!/usr/bin/env node
+const fs = require('fs');
+const vm = require('vm');
+
+// ── 合法字段名 ──
+const VALID_TOP = new Set([
+  'bookSourceUrl','bookSourceName','bookSourceType','bookSourceComment','bookSourceGroup',
+  'bookUrlPattern','enabled','enabledExplore','enabledCookieJar',
+  'header','concurrentRate','jsLib','loginUrl','loginUi','loginCheckJs',
+  'coverDecodeJs','eventListener','customButton','customOrder',
+  'searchUrl','weight','respondTime','lastUpdateTime',
+  'ruleSearch','ruleBookInfo','ruleToc','ruleContent','ruleReview','ruleExplore','exploreUrl',
+]);
+
+const VALID_RULES = {
+  ruleSearch: new Set([
+    'checkKeyWord','bookList','name','author','bookUrl','coverUrl',
+    'kind','lastChapter','updateTime','wordCount','intro',
+  ]),
+  ruleBookInfo: new Set([
+    'init','name','author','intro','coverUrl','kind','lastChapter',
+    'tocUrl','wordCount','updateTime','canReName','downloadUrls',
+  ]),
+  ruleToc: new Set([
+    'chapterList','chapterName','chapterUrl','nextTocUrl',
+    'isVip','isPay','isVolume','preUpdateJs','formatJs','updateTime',
+  ]),
+  ruleContent: new Set([
+    'content','nextContentUrl','replaceRegex','webJs','sourceRegex',
+    'imageDecode','payAction','imageStyle','callBackJs',
+  ]),
+  ruleExplore: new Set([
+    'bookList','name','author','bookUrl','coverUrl','kind',
+    'lastChapter','updateTime','wordCount','intro',
+  ]),
+};
+
+// ── 必填字段（path, severity, message）──
+const REQUIRED_FIELDS = [
+  ['bookSourceUrl', 'error', '主键，缺失会导致无法导入或与其他源冲突'],
+  ['bookSourceName', 'error', '书源显示名'],
+  ['bookSourceType', 'error', '必须指定：0=文本 1=音频 2=图片 3=文件'],
+  ['searchUrl', 'error', '搜索地址'],
+  ['ruleSearch', 'error', '搜索规则'],
+  ['ruleSearch.bookList', 'warning', '搜索结果列表容器'],
+  ['ruleSearch.name', 'warning', '书名字段'],
+  ['ruleSearch.author', 'warning', '作者字段'],
+  ['ruleSearch.bookUrl', 'warning', '详情页链接'],
+  ['ruleBookInfo', 'warning', '详情规则'],
+  ['ruleToc', 'error', '目录规则'],
+  ['ruleToc.chapterList', 'error', '章节列表容器'],
+  ['ruleToc.chapterName', 'error', '章节名'],
+  ['ruleToc.chapterUrl', 'error', '章节链接'],
+  ['ruleContent', 'error', '正文规则'],
+  ['ruleContent.content', 'error', '正文内容选择器'],
+];
+
+// ── Legado java.* API ──
+const VALID_JAVA_APIS = new Set([
+  'java.ajax','java.ajaxAll','java.connect',
+  'java.get','java.head','java.post',
+  'java.url','java.ruleUrl',
+  'java.webView','java.webViewGetOverrideUrl','java.webViewGetSource',
+  'java.md5Encode','java.md5Encode16',
+  'java.digestHex','java.digestBase64Str',
+  'java.HMacHex','java.HMacBase64',
+  'java.base64Decode','java.base64DecodeToByteArray','java.base64Encode',
+  'java.hexDecodeToByteArray','java.hexDecodeToString','java.hexEncodeToString',
+  'java.createSymmetricCrypto','java.createAsymmetricCrypto','java.createSign',
+  'java.getString','java.getStringList','java.setContent',
+  'java.getElement','java.getElements',
+  'java.encodeURI','java.t2s','java.s2t','java.htmlFormat',
+  'java.strToBytes','java.bytesToStr',
+  'java.ocr','java.getVerificationCode',
+  'java.queryTTF','java.replaceFont',
+  'java.put','java.get',
+  'java.downloadFile','java.readTxtFile','java.deleteFile',
+  'java.cacheFile','java.importScript',
+  'java.unzipFile','java.unrarFile','java.un7zFile','java.unArchiveFile',
+  'java.getTxtInFolder',
+  'java.getZipStringContent','java.getZipByteArrayContent',
+  'java.getRarStringContent','java.getRarByteArrayContent',
+  'java.get7zStringContent','java.get7zByteArrayContent',
+  'java.toast','java.longToast','java.log','java.logType',
+  'java.startBrowser','java.startBrowserAwait','java.openUrl',
+  'java.copyText','java.randomUUID','java.androidId',
+  'java.toNumChapter','java.getWebViewUA',
+  'java.timeFormat','java.timeFormatUTC',
+  'java.refreshTocUrl','java.reGetBook',
+  'java.setLocal',
+  'java.initUrl','java.getStrResponse',
+]);
+
+// ── 浏览器API（仅webView/webJs上下文可用）──
+const BROWSER_GLOBALS = [
+  'document','window','navigator','location','history',
+  'localStorage','sessionStorage','screen','parent','top','self',
+  'fetch','XMLHttpRequest','WebSocket','EventSource',
+  'addEventListener','removeEventListener','dispatchEvent',
+  'getElementById','getElementsByClassName','getElementsByTagName',
+  'querySelector','querySelectorAll',
+  'alert','confirm','prompt',
+  'setTimeout','setInterval','clearTimeout','clearInterval',
+  'requestAnimationFrame','cancelAnimationFrame',
+  'console',
+  'innerHTML','outerHTML','innerText','textContent',
+  'classList','className','parentNode','childNodes',
+  'firstChild','lastChild','nextSibling','previousSibling',
+  'nextElementSibling','previousElementSibling',
+  'style','dataset','getAttribute','setAttribute',
+  'createElement','createTextNode','appendChild','removeChild',
+  'Blob','File','FileReader','FormData','URL','URLSearchParams',
+  'atob','btoa','Image',
+];
+
+// ── Rhino不兼容语法 ──
+const RHINO_CHECKS = [
+  { pattern: /\basync\s+(function|\(|\w+\s*\()/, severity: 'error', msg: 'async/await — Rhino不支持，用Promise链' },
+  { pattern: /\bawait\s+/, severity: 'error', msg: 'await — Rhino不支持，用.then()' },
+  { pattern: /\bclass\s+[A-Za-z_$]/, severity: 'error', msg: 'ES6 class — Rhino不支持，用function+prototype' },
+  { pattern: /\.\.\.\s*(arr|args|[a-zA-Z_$]\w*)\s*\)/, severity: 'error', msg: '函数调用展开(...args) — 用fn.apply(null, arr)' },
+  { pattern: /for\s*\(\s*(let|const|var)\s+\w+\s+of\s+/, severity: 'warning', msg: 'for...of在Java List上可能失败 — 用list.size()+list.get(i)' },
+];
+
+// ── 工具函数 ──
+function stripComments(code) {
+  return code.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+}
+
+function stripStrings(code) {
+  return code
+    .replace(/"[^"\\]*(?:\\.[^"\\]*)*"/g, '""')
+    .replace(/'[^'\\]*(?:\\.[^'\\]*)*'/g, "''")
+    .replace(/`[^`\\]*(?:\\.[^`\\]*)*`/g, '``');
+}
+
+function stripRegex(code) {
+  // 去掉正则字面量 /.../，避免里面的{ } [ ] ( ) 被误计
+  return code.replace(/\/[^\/\n\\]*(?:\\.[^\/\n\\]*)*\//g, '""');
+}
+
+function stripAll(code) { return stripRegex(stripComments(stripStrings(code))); }
+
+function lineAt(code, pos) {
+  const lineNum = code.slice(0, pos).split('\n').length;
+  const lineStart = code.lastIndexOf('\n', pos) + 1;
+  let lineEnd = code.indexOf('\n', pos);
+  if (lineEnd === -1) lineEnd = code.length;
+  return { lineNum, line: code.slice(lineStart, lineEnd).trim().slice(0, 100) };
+}
+
+// ── 提取JS块 ──
+function extractJsBlocks(obj, path = '') {
+  const blocks = [];
+  const jsFields = new Set([
+    'init','loginCheckJs','loginUrl','preUpdateJs','formatJs','webJs',
+    'imageDecode','payAction','callBackJs','jsLib','coverDecodeJs',
+  ]);
+
+  if (typeof obj === 'string') {
+    if (obj.startsWith('@js:')) {
+      blocks.push({ path: `${path}[@js:]`, code: obj.slice(4) });
+    }
+    const jsMatches = obj.match(/<js>([\s\S]*?)<\/js>/g);
+    if (jsMatches) {
+      jsMatches.forEach((m, i) => {
+        const inner = m.replace(/<\/?js>/g, '');
+        blocks.push({ path: `${path}[<js>#${i}]`, code: inner });
+      });
+    }
+    if (path.endsWith('.searchUrl') && !obj.startsWith('http') && /\b(function|return|java\.)/.test(obj)) {
+      blocks.push({ path: `${path}[searchUrl]`, code: obj });
+    }
+  } else if (Array.isArray(obj)) {
+    obj.forEach((v, i) => blocks.push(...extractJsBlocks(v, `${path}[${i}]`)));
+  } else if (obj && typeof obj === 'object') {
+    for (const [k, v] of Object.entries(obj)) {
+      const childPath = path ? `${path}.${k}` : k;
+      if (jsFields.has(k) && typeof v === 'string' && v.trim()) {
+        blocks.push({ path: childPath, code: v });
+      } else {
+        blocks.push(...extractJsBlocks(v, childPath));
+      }
+    }
+  }
+  return blocks;
+}
+
+// ── 检查器 ──
+function checkRhinoIssues(code) {
+  const issues = [];
+  const clean = stripAll(code);
+  for (const { pattern, severity, msg } of RHINO_CHECKS) {
+    const m = pattern.exec(clean);
+    if (m) {
+      const { lineNum, line } = lineAt(code, m.index);
+      issues.push({ severity, msg: `${msg}\n    → line ${lineNum}: ${line}` });
+    }
+  }
+  return issues;
+}
+
+function checkJavaApis(code) {
+  const unknown = [];
+  const calls = new Set(code.match(/\bjava\.\w+/g) || []);
+  for (const call of calls) {
+    if (!VALID_JAVA_APIS.has(call)) unknown.push(`未知java API: ${call}`);
+  }
+  return unknown;
+}
+
+function checkBraceBalance(code) {
+  code = stripAll(code);
+  const stack = [];
+  const pairs = { '{': '}', '[': ']', '(': ')' };
+  const closing = { '}': '{', ']': '[', ')': '(' };
+  for (let i = 0; i < code.length; i++) {
+    const ch = code[i];
+    if (pairs[ch]) { stack.push({ ch, pos: i }); }
+    else if (closing[ch]) {
+      if (!stack || stack[stack.length - 1].ch !== closing[ch]) {
+        const { lineNum } = lineAt(code, i);
+        return [`括号不匹配 '${ch}' at line ${lineNum}`];
+      }
+      stack.pop();
+    }
+  }
+  if (stack.length) {
+    return [`未闭合: ${stack.map(s => `'${s.ch}' at col ${s.pos}`).join(', ')}`];
+  }
+  return [];
+}
+
+function checkBrowserApis(code, snippetPath) {
+  if (/webJs|webView/.test(snippetPath)) return [];
+  const noStrings = stripStrings(code);
+  const issues = [];
+  for (const api of BROWSER_GLOBALS) {
+    if (new RegExp('\\b' + api.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b').test(noStrings)) {
+      issues.push(`浏览器API '${api}' — 仅在java.webView()参数或webJs中可用，其他位置会ReferenceError`);
+    }
+  }
+  return issues;
+}
+
+// ── 主逻辑 ──
+function main() {
+  const file = process.argv[2];
+  if (!file) {
+    console.error('用法: node validate-booksource.js <书源.json>');
+    process.exit(1);
+  }
+
+  let src;
+  try {
+    src = JSON.parse(fs.readFileSync(file, 'utf-8'));
+  } catch (e) {
+    console.error(`JSON解析失败: ${e.message}`);
+    process.exit(1);
+  }
+
+  const errors = [];
+  const warnings = [];
+
+  // 1. 必填字段
+  for (const [path, severity, msg] of REQUIRED_FIELDS) {
+    const parts = path.split('.');
+    let obj = src, found = true;
+    for (const key of parts) {
+      if (obj && typeof obj === 'object' && key in obj && obj[key] !== '') {
+        obj = obj[key];
+      } else { found = false; break; }
+    }
+    if (!found) {
+      const entry = `缺少 ${path} — ${msg}`;
+      (severity === 'error' ? errors : warnings).push(entry);
+    }
+  }
+  if (typeof src.searchUrl === 'string' && !src.searchUrl.trim()) {
+    errors.push('searchUrl 为空字符串');
+  }
+
+  // 2. 字段名检查
+  for (const k of Object.keys(src)) {
+    if (!VALID_TOP.has(k)) warnings.push(`未知顶层字段: ${k}`);
+  }
+  for (const [rule, validSet] of Object.entries(VALID_RULES)) {
+    if (src[rule]) {
+      for (const k of Object.keys(src[rule])) {
+        if (!validSet.has(k)) warnings.push(`${rule} 未知字段: ${k}`);
+      }
+    }
+  }
+
+  // 3. JS分析
+  const jsBlocks = extractJsBlocks(src);
+  if (jsBlocks.length) {
+    console.log(`发现 ${jsBlocks.length} 个JS代码块:`);
+    for (const { path, code } of jsBlocks) {
+      const preview = code.replace(/\n/g, '\\n').slice(0, 90);
+      console.log(`  [${path}] ${preview}${code.length > 90 ? '…' : ''}`);
+    }
+  } else {
+    console.log('(书源中未发现JS代码)');
+  }
+
+  for (const { path, code } of jsBlocks) {
+    // 基础语法检查（vm.Script 与 Legado 一致，代码原样编译不包裹函数）
+    try { new vm.Script(code); } catch (e) {
+      errors.push(`[${path}] JS语法错误: ${e.message}`);
+    }
+    for (const { severity, msg } of checkRhinoIssues(code)) {
+      (severity === 'error' ? errors : warnings).push(`[${path}] ${msg}`);
+    }
+    for (const msg of checkJavaApis(code)) {
+      errors.push(`[${path}] ${msg}`);
+    }
+    for (const msg of checkBraceBalance(code)) {
+      errors.push(`[${path}] ${msg}`);
+    }
+    for (const msg of checkBrowserApis(code, path)) {
+      errors.push(`[${path}] ${msg}`);
+    }
+  }
+
+  // 输出报告
+  if (errors.length) {
+    console.log(`\n❌ ${errors.length} 个错误:`);
+    errors.forEach(e => console.log(`  ✗ ${e}`));
+  }
+  if (warnings.length) {
+    console.log(`\n⚠️  ${warnings.length} 个警告:`);
+    warnings.forEach(w => console.log(`  ! ${w}`));
+  }
+  if (!errors.length && !warnings.length) {
+    console.log('\n✅ 全部通过');
+  }
+
+  console.log(`\n─── ${jsBlocks.length} 个JS块, ${errors.length} 错误, ${warnings.length} 警告 ───`);
+  process.exit(errors.length ? 1 : 0);
+}
+
+main();

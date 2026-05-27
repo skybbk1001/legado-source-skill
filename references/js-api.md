@@ -101,6 +101,7 @@ java.startBrowser(url: String, title: String)
 
 // 使用内置浏览器打开链接，并等待网页结果 .body()获取网页内容
 java.startBrowserAwait(url: String, title: String, refetchAfterSuccess: Boolean? = true): StrResponse
+```
 
 ## 加密
 
@@ -359,7 +360,7 @@ chapter.baseUrl;     // 相对链接基地址
 ### 从 API ID 构建 URL
 
 ```
-{{`https://www.example.com/book/${result}`}}
+$.bookId@js:`https://www.example.com/book/${result}`
 ```
 
 ### 图片带 Referer 头

@@ -209,6 +209,56 @@ CF 模板见 [[references/anti-bot.md]]。
 
 ---
 
-## 发现页（`exploreUrl`）
+## 发现页
 
-格式 `分类名::URL`，一行一条。`ruleExplore` 与 `ruleSearch` 结构相同（一致则省略）。
+### 通用模式
+
+`exploreUrl` 写分类入口（JSON 数组格式推荐），`ruleExplore` 结构与 `ruleSearch` 一致。
+
+**关键行为：搜索和发现结果结构相同 → 只写 `exploreUrl`，不写 `ruleExplore`，引擎自动回退到 `ruleSearch`。**
+
+分页可用 `<page1,page2,page3>` 模式——每次加载页号递增，超出用最后一个值。
+
+### HTML 站发现
+
+```json
+{
+  "enabledExplore": true,
+  "exploreUrl": "[{\"title\":\"玄幻\",\"url\":\"https://www.example.com/sort/1/<1,2,3>\"},{\"title\":\"都市\",\"url\":\"https://www.example.com/sort/2/<1,2,3>\"}]"
+}
+```
+
+### JSON API 站发现
+
+```json
+{
+  "enabledExplore": true,
+  "exploreUrl": "<js>[{title:'玄幻',url:'https://api.example.com/list?type=1&page=<1,2,3,4,5>'},{title:'都市',url:'https://api.example.com/list?type=2&page=<1,2,3,4,5>'}]</js>"
+}
+```
+
+### 发现结构与搜索不同
+
+结构不同时写独立的 `ruleExplore`，引擎优先用它。`bookList` 为空才回退 `ruleSearch`。
+
+```json
+{
+  "enabledExplore": true,
+  "exploreUrl": "[{\"title\":\"热门\",\"url\":\"https://www.example.com/hot\"}]",
+  "ruleExplore": {
+    "bookList": "div.hot-book",
+    "name": "h4@text",
+    "author": "span.author@text",
+    "bookUrl": "a@href",
+    "coverUrl": "img@src"
+  }
+}
+```
+
+### 文本格式
+
+`分类名::URL`，多条用 `&&` 或换行分隔。用于简单站点快速手写。
+
+```
+玄幻::https://www.example.com/sort/1/<1,2,3>&&都市::https://www.example.com/sort/2/<1,2,3>
+```

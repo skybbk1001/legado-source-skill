@@ -173,6 +173,8 @@ java.getElements(ruleStr);                // → Array<Element>
 
 ```js
 java.encodeURI(str);                 // URL 编码（UTF-8）
+java.toURL(urlStr);                  // 解析 URL → { url, host, path, queryMap, ... }
+java.toURL(url, baseUrl);            // 解析相对 URL
 java.t2s(text);                      // 繁体 → 简体
 java.s2t(text);                      // 简体 → 繁体
 java.htmlFormat(str);                // 清理 HTML
@@ -273,6 +275,7 @@ java.logType(variable);              // 输出类型和值
 java.startBrowser(url, "Title");     // 内置浏览器，不等结果
 java.startBrowserAwait(url, "Title"); // 浏览器，等结果 → StrResponse
 java.startBrowserAwait(url, title, refetchAfterSuccess); // 第三参数控制是否自动重新获取
+java.showBrowser(url, html?, preloadJs?, config?); // 显示内置浏览器，用户手动操作
 java.openUrl(url);                   // 外部浏览器
 java.openUrl(url, mimeType);         // 带 MIME 类型提示打开
 java.copyText(text);                 // 复制到剪贴板

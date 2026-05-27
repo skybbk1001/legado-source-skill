@@ -9,6 +9,7 @@
 | `bookSourceUrl` | ✓ | **主键**，改了即新书源 |
 | `bookSourceName` | ✓ | 显示名 |
 | `bookSourceType` | ✓ | `0`=文本 `1`=音频 `2`=图片 `3`=文件 |
+| `bookSourceComment` |  | 用户备注 |
 | `enabled` |  | 默认 true |
 | `enabledExplore` |  | 开启"发现"页 |
 | `enabledCookieJar` |  | 登录/session 站点需 true |
@@ -19,7 +20,7 @@
 | `loginUrl` / `loginUi` / `loginCheckJs` |  | 登录三件套，见 [[references/anti-bot.md]] |
 | `coverDecodeJs` |  | 封面解密 JS |
 | `eventListener` + `customButton` |  | 事件回调，见 [[references/js-api.md]] §callBackJs |
-| `ruleExplore` + `exploreUrl` |  | 发现页规则 |
+| `ruleExplore` + `exploreUrl` |  | 发现页，详见下文 §发现 |
 | `ruleSearch` / `ruleBookInfo` / `ruleToc` / `ruleContent` | ✓ | 四类规则对象，见下文 |
 
 ## 搜索 `ruleSearch`
@@ -108,3 +109,33 @@
 ## 翻页字段
 
 `nextTocUrl`/`nextContentUrl`：返回非空继续，空则停止。末页必须返回空否则死循环。
+
+## 发现 `ruleExplore` + `exploreUrl`
+
+`exploreUrl` 定义分类入口，有三种写法：
+
+| 格式 | 示例 | 适用场景 |
+|------|------|----------|
+| JSON 数组（推荐） | `[{"title":"玄幻","url":"https://x.com/xh"},{"title":"都市","url":"https://x.com/ds"}]` | 通用，最可靠 |
+| JS 生成 | `<js>[{title:"玄幻",url:"https://x.com/xh"}]</js>` | 分类需动态抓取 |
+| 文本格式（旧） | `玄幻::https://x.com/xh&&都市::https://x.com/ds` | 简单站点，快速手写 |
+
+`exploreUrl` 中的每个 URL 跟 `searchUrl` 一样支持 `{{page}}`、`<page1,page2>`、URL 选项（POST/headers/webView）。
+
+`ruleExplore` 结构与 `ruleSearch` **完全相同**（bookList、name、author、bookUrl 等 10 个字段），仅无 `checkKeyWord`。**关键行为：如果 `ruleExplore.bookList` 为空，引擎自动回退使用 `ruleSearch`。** 搜索结果和发现结果结构一致时，只写 `exploreUrl` + `enabledExplore: true` 即可。
+
+```json
+{
+  "enabledExplore": true,
+  "exploreUrl": "[{\"title\":\"玄幻\",\"url\":\"https://www.example.com/sort/1/<1,2,3>\"},{\"title\":\"都市\",\"url\":\"https://www.example.com/sort/2/<1,2,3>\"}]",
+  "ruleExplore": {
+    "bookList": "div.result-list > div.item",
+    "name": "h3.title@text",
+    "author": "span.author@text",
+    "bookUrl": "a@href",
+    "coverUrl": "img@src"
+  }
+}
+```
+
+发现结果分页可用 `<page1,page2,page3>` 模式，每次加载页号递增。上例中 sort/1/1、sort/1/2、sort/1/3 依次请求，超出后用最后一个值。

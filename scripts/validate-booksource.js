@@ -70,6 +70,7 @@ const VALID_JAVA_APIS = new Set([
   'java.getString','java.getStringList','java.setContent',
   'java.getElement','java.getElements',
   'java.encodeURI','java.t2s','java.s2t','java.htmlFormat',
+  'java.toURL',
   'java.strToBytes','java.bytesToStr',
   'java.ocr','java.getVerificationCode',
   'java.queryTTF','java.replaceFont',
@@ -83,6 +84,7 @@ const VALID_JAVA_APIS = new Set([
   'java.get7zStringContent','java.get7zByteArrayContent',
   'java.toast','java.longToast','java.log','java.logType',
   'java.startBrowser','java.startBrowserAwait','java.openUrl',
+  'java.showBrowser',
   'java.copyText','java.randomUUID','java.androidId',
   'java.toNumChapter','java.getWebViewUA',
   'java.timeFormat','java.timeFormatUTC',
@@ -167,9 +169,6 @@ function extractJsBlocks(obj, path = '') {
         const inner = m.replace(/<\/?js>/g, '');
         blocks.push({ path: `${path}[<js>#${i}]`, code: inner });
       });
-    }
-    if (path.endsWith('.searchUrl') && !obj.startsWith('http') && /\b(function|return|java\.)/.test(obj)) {
-      blocks.push({ path: `${path}[searchUrl]`, code: obj });
     }
   } else if (Array.isArray(obj)) {
     obj.forEach((v, i) => blocks.push(...extractJsBlocks(v, `${path}[${i}]`)));

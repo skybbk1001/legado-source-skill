@@ -261,7 +261,8 @@ div.title@@get:{var}::after
 https://www.example.com/search?keyword={{key}}&page={{page}}
 ```
 
-`{{key}}` 自动 URL 编码。
+`{{key}}` 自动 URL 编码。`{{page}}` 从 1 开始递增。
+
 
 ### URL 选项
 

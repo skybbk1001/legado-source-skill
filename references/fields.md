@@ -91,6 +91,7 @@
 ```json
 {
   "content": "div#content@html",
+  "title": "",
   "nextContentUrl": "div.page_link a@href",
   "replaceRegex": "##\\s{2,}|&nbsp;",
   "webJs": "",
@@ -98,7 +99,7 @@
   "imageDecode": "",
   "payAction": "",
   "imageStyle": "",
-  "callBackJs": ""
+  "callBackJs": "",
 }
 ```
 

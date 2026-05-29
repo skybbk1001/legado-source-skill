@@ -52,7 +52,7 @@ Rhino 支持大部分 ES6+：
 | `key` | String? | 搜索规则 + loginCheckJs（搜索外为 null） |
 | `page` | Int | 搜索/目录规则（当前页码） |
 
-规则 JS 中 `java` 是 `AnalyzeRule`。`loginCheckJs` 中是 `AnalyzeUrl`（可访问 `java.initUrl()` / `java.getStrResponse()`）。
+规则 JS 中 `java` 是 `AnalyzeRule`。`loginCheckJs` 中是 `AnalyzeUrl`，额外可访问 `java.url`（当前请求 URL）、`java.ruleUrl`（原始规则 URL）、`java.initUrl()`、`java.getStrResponse()`。
 
 ## 网络请求
 
@@ -203,11 +203,7 @@ java.replaceFont(result, f1, f2, true);  // true = 过滤无映射字形
 ## 存储与缓存
 
 ```js
-// 每个书源（持久化）
-java.put(key, value);
-java.get(key);
-
-// 每个书源（会话，通过 source 对象）
+// 每个书源（会话）
 source.put(key, value);
 source.get(key);
 
@@ -313,14 +309,6 @@ java.refreshTocUrl();
 
 // 用书名+作者重新搜索 → 更新 book.bookUrl 和变量
 java.reGetBook();
-```
-
-规则 JS 和 `preUpdateJs` 中可用：
-
-```js
-// 设置/获取局部变量（会话范围，规则求值后清除）
-java.set("key", "value");
-java.get("key");                     // 读取通过 @put: 或 setLocal 设置的变量
 ```
 
 ## Book 与 Chapter

@@ -27,7 +27,7 @@ const VALID_RULES = {
   ]),
   ruleContent: new Set([
     'content','nextContentUrl','replaceRegex','webJs','sourceRegex',
-    'imageDecode','payAction','imageStyle','callBackJs',
+    'imageDecode','payAction','imageStyle','callBackJs','title',
   ]),
   ruleExplore: new Set([
     'bookList','name','author','bookUrl','coverUrl','kind',
@@ -40,7 +40,7 @@ const REQUIRED_FIELDS = [
   ['bookSourceUrl', 'error', '主键，缺失会导致无法导入或与其他源冲突'],
   ['bookSourceName', 'error', '书源显示名'],
   ['bookSourceType', 'error', '必须指定：0=文本 1=音频 2=图片 3=文件'],
-  ['searchUrl', 'error', '搜索地址'],
+  ['searchUrl', 'warning', '搜索地址（explore-only源可为空）'],
   ['ruleSearch', 'error', '搜索规则'],
   ['ruleSearch.bookList', 'warning', '搜索结果列表容器'],
   ['ruleSearch.name', 'warning', '书名字段'],
@@ -75,7 +75,7 @@ const VALID_JAVA_APIS = new Set([
   'java.ocr','java.getVerificationCode',
   'java.queryTTF','java.replaceFont',
   'java.put','java.get',
-  'java.downloadFile','java.readTxtFile','java.deleteFile',
+  'java.downloadFile','java.readTxtFile','java.deleteFile','java.getFile','java.readFile',
   'java.cacheFile','java.importScript',
   'java.unzipFile','java.unrarFile','java.un7zFile','java.unArchiveFile',
   'java.getTxtInFolder',
@@ -89,7 +89,6 @@ const VALID_JAVA_APIS = new Set([
   'java.toNumChapter','java.getWebViewUA',
   'java.timeFormat','java.timeFormatUTC',
   'java.refreshTocUrl','java.reGetBook',
-  'java.setLocal',
   'java.initUrl','java.getStrResponse',
 ]);
 
@@ -336,6 +335,17 @@ function main() {
         if (!validSet.has(k)) warnings.push(`${rule} 未知字段: ${k}`);
       }
     }
+  }
+
+  // 2.5 类型检查
+  if (typeof src.concurrentRate === 'number') errors.push('concurrentRate 必须是字符串 "1000"，不能是数字');
+  if (typeof src.bookSourceType === 'string') errors.push('bookSourceType 必须是数字 0/1/2/3，不能是字符串');
+  if (src.header !== undefined && src.header !== null && typeof src.header !== 'string') errors.push('header 必须是 JSON 字符串，不能直接写对象');
+  if (typeof src.bookUrlPattern === 'string' && src.bookUrlPattern.trim()) {
+    try { new RegExp(src.bookUrlPattern); } catch (e) { errors.push(`bookUrlPattern 正则无效: ${e.message}`); }
+  }
+  if (src.ruleContent && typeof src.ruleContent.sourceRegex === 'string' && src.ruleContent.sourceRegex.trim()) {
+    try { new RegExp(src.ruleContent.sourceRegex); } catch (e) { errors.push(`ruleContent.sourceRegex 正则无效: ${e.message}`); }
   }
 
   // 3. replaceRegex 语法验证

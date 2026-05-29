@@ -97,7 +97,7 @@ AI：使用curl、Playwright MCP（DOM、Network XHR）、Nodejs、读文件等�
 
 ---
 
-### Phase 4: 脚本验证
+### Phase 4: 数据验证
 
 **目标：** 用 Node.js 脚本验证分析结果，确保选择器和加密逻辑正确，再写书源。
 
@@ -112,6 +112,7 @@ AI：使用curl、Playwright MCP（DOM、Network XHR）、Nodejs、读文件等�
 | 目录翻页 | nextTocUrl 规律一致、翻页后章节不同 |
 | 正文 | 可访问、正文非空无乱码 |
 | 正文翻页 | nextContentUrl 规律一致、翻页后内容不同 |
+| 替换净化 | 语法正确，替换无误伤 |
 | 加解密 | 函数输出与浏览器一致（如有） |
 
 ```bash
@@ -137,9 +138,9 @@ node tmp/verify.js
 
 ---
 
-### Phase 6: 交叉验证
+### Phase 6: 语法验证
 
-**目标：** 检查书源 JSON 的结构、JS 语法和字段名合法性。
+**目标：** 检查书源 JSON 的结构、JS 语法和字段名合法性。脚本在[[scripts/validate-booksource.js]]
 
 ```bash
 node scripts/validate-booksource.js path/to/booksource.json

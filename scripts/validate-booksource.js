@@ -109,7 +109,7 @@ const BROWSER_GLOBALS = [
   'classList','className','parentNode','childNodes',
   'firstChild','lastChild','nextSibling','previousSibling',
   'nextElementSibling','previousElementSibling',
-  'style','dataset','getAttribute','setAttribute',
+  'dataset','getAttribute','setAttribute',
   'createElement','createTextNode','appendChild','removeChild',
   'Blob','File','FileReader','FormData','URL','URLSearchParams',
   'atob','btoa','Image',
@@ -137,11 +137,12 @@ function stripStrings(code) {
 }
 
 function stripRegex(code) {
-  // 去掉正则字面量 /.../，避免里面的{ } [ ] ( ) 被误计
-  return code.replace(/\/[^\/\n\\]*(?:\\.[^\/\n\\]*)*\//g, '""');
+  // 去掉正则字面量 /.../flags，避免里面的{ } [ ] ( ) // 被误计
+  // MUST run BEFORE stripComments because \// inside a regex can look like //
+  return code.replace(/\/[^\/\n\\]*(?:\\.[^\/\n\\]*)*\/[gimsuy]*/g, '""');
 }
 
-function stripAll(code) { return stripRegex(stripComments(stripStrings(code))); }
+function stripAll(code) { return stripComments(stripRegex(stripStrings(code))); }
 
 function lineAt(code, pos) {
   const lineNum = code.slice(0, pos).split('\n').length;
@@ -231,7 +232,7 @@ function checkBraceBalance(code) {
 }
 
 function checkBrowserApis(code, snippetPath) {
-  if (/webJs|webView/.test(snippetPath)) return [];
+  if (/webJs|webView|exploreUrl/.test(snippetPath)) return [];
   const noStrings = stripStrings(code);
   const issues = [];
   for (const api of BROWSER_GLOBALS) {
@@ -240,6 +241,52 @@ function checkBrowserApis(code, snippetPath) {
     }
   }
   return issues;
+}
+
+// ── replaceRegex 验证 ──
+// 格式: ## 切片: ['', regex] | ['', regex, replacement] | 末段='#'=仅替换首个
+// >4 段 或 末段非 #/空 → 格式错误
+function validateReplaceRegex(rr, path) {
+  const issues = [];
+  if (!rr || typeof rr !== 'string' || !rr.trim()) return issues;
+
+  const parts = rr.split('##');
+  const firstOnly = parts[parts.length - 1] === '#';
+  const body = firstOnly ? parts.slice(0, -1) : parts;
+
+  if (body.length < 2 || body.length > 3) {
+    issues.push({ severity: 'error', msg: `${path} 格式错误 (${parts.length}段) — 应为 ##regex 或 ##regex##replacement 或末尾 +###` });
+    return issues;
+  }
+  const regexStr = body[1];
+  if (!regexStr) {
+    issues.push({ severity: 'error', msg: `${path} 正则为空` });
+    return issues;
+  }
+  return validateRegexStr(regexStr, path);
+}
+
+function validateRegexStr(regexStr, path) {
+  const issues = [];
+  try { new RegExp(regexStr); } catch (e) {
+    issues.push({ severity: 'warning', msg: `${path} 正则编译失败(Java/JS可能有差异): ${e.message}\n    正则: ${regexStr}` });
+  }
+  if (/\.\*|\.\+/.test(regexStr) && !/\[\\[sS]\]/.test(regexStr)) {
+    issues.push({ severity: 'warning', msg: `${path} .* 或 .+ — Java 中 . 不匹配换行符，跨行请用 [\\s\\S]` });
+  }
+  return issues;
+}
+
+// 遍历书源收集所有 replaceRegex 字段
+function collectReplaceRegex(obj, path) {
+  const results = [];
+  if (!obj || typeof obj !== 'object') return results;
+  for (const [k, v] of Object.entries(obj)) {
+    const childPath = path ? `${path}.${k}` : k;
+    if (k === 'replaceRegex' && typeof v === 'string') results.push({ path: childPath, value: v });
+    else if (v && typeof v === 'object') results.push(...collectReplaceRegex(v, childPath));
+  }
+  return results;
 }
 
 // ── 主逻辑 ──
@@ -291,7 +338,22 @@ function main() {
     }
   }
 
-  // 3. JS分析
+  // 3. replaceRegex 语法验证
+  const rrFields = collectReplaceRegex(src);
+  if (rrFields.length) {
+    console.log(`\n发现 ${rrFields.length} 个 replaceRegex 规则:`);
+    for (const { path, value } of rrFields) {
+      const preview = value.length > 80 ? value.slice(0, 80) + '…' : value;
+      console.log(`  [${path}] ${preview}`);
+    }
+    for (const { path, value } of rrFields) {
+      for (const { severity, msg } of validateReplaceRegex(value, `[${path}]`)) {
+        (severity === 'error' ? errors : warnings).push(msg);
+      }
+    }
+  }
+
+  // 4. JS分析
   const jsBlocks = extractJsBlocks(src);
   if (jsBlocks.length) {
     console.log(`发现 ${jsBlocks.length} 个JS代码块:`);

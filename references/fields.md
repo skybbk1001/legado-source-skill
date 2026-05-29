@@ -116,26 +116,37 @@
 
 | 格式 | 示例 | 适用场景 |
 |------|------|----------|
-| JSON 数组（推荐） | `[{"title":"玄幻","url":"https://x.com/xh"},{"title":"都市","url":"https://x.com/ds"}]` | 通用，最可靠 |
-| JS 生成 | `<js>[{title:"玄幻",url:"https://x.com/xh"}]</js>` | 分类需动态抓取 |
+| JSON 数组 | `[{"title":"玄幻","url":"https://x.com/xh"}]` | 通用 |
+| JS 生成 | `<js>...</js>` 返回 JSON 数组字符串 | 分类需动态抓取、带分区头、带 style |
 | 文本格式（旧） | `玄幻::https://x.com/xh&&都市::https://x.com/ds` | 简单站点，快速手写 |
+
+每个条目字段：
+
+| 字段 | 必填 | 说明 |
+|------|------|------|
+| `title` | ✓ | 分类显示名。分区头可用装饰字符如 `▱▱▱▱男生▱▱▱▱` |
+| `url` |  | 分类页 URL。分区头可不传 |
+| `style` |  | Yoga Layout 样式，**值均为字符串**。分区头用 `{"layout_flexBasisPercent":"1"}` 占满整行；子分类用 `{"layout_flexBasisPercent":"0.25","layout_flexGrow":"1"}` 四列自适应 |
 
 `exploreUrl` 中的每个 URL 跟 `searchUrl` 一样支持 `{{page}}`、`<page1,page2>`、URL 选项（POST/headers/webView）。
 
-`ruleExplore` 结构与 `ruleSearch` **完全相同**（bookList、name、author、bookUrl 等 10 个字段），仅无 `checkKeyWord`。**关键行为：如果 `ruleExplore.bookList` 为空，引擎自动回退使用 `ruleSearch`。** 搜索结果和发现结果结构一致时，只写 `exploreUrl` + `enabledExplore: true` 即可。
+`ruleExplore` 结构与 `ruleSearch` **完全相同**，仅无 `checkKeyWord`。若 `ruleExplore.bookList` 为空，引擎自动回退使用 `ruleSearch`。
 
-```json
-{
-  "enabledExplore": true,
-  "exploreUrl": "[{\"title\":\"玄幻\",\"url\":\"https://www.example.com/sort/1/<1,2,3>\"},{\"title\":\"都市\",\"url\":\"https://www.example.com/sort/2/<1,2,3>\"}]",
-  "ruleExplore": {
-    "bookList": "div.result-list > div.item",
-    "name": "h3.title@text",
-    "author": "span.author@text",
-    "bookUrl": "a@href",
-    "coverUrl": "img@src"
-  }
-}
+### 动态发现示例（JS 生成 + 分区头 + style）
+
+```js
+// exploreUrl 用 <js> 动态抓分类，区分区头(占满行)和子项(四列)
+let src = org.jsoup.Jsoup.parse(java.ajax('https://www.qidian.com/all/'));
+let list = [];
+let addItem = (title, url, flexBasis) => {
+  list.push({ title, url, style: { layout_flexGrow: '1', layout_flexBasisPercent: flexBasis } });
+};
+
+// 分区头：flexBasis = '1' (100%宽度)
+addItem('▱▱▱▱男生▱▱▱▱', null, '1');
+// 子分类：flexBasis = '0.25' (25%宽度，4列)
+src.select('.type-filter').get(1).select('a').forEach(el => {
+  addItem(el.text(), 'https:' + el.attr('href'), '0.25');
+});
+JSON.stringify(list);
 ```
-
-发现结果分页可用 `<page1,page2,page3>` 模式，每次加载页号递增。上例中 sort/1/1、sort/1/2、sort/1/3 依次请求，超出后用最后一个值。

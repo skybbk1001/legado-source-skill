@@ -10,7 +10,7 @@
 | `challenges.cloudflare.com` / `_cf_chl_opt` | CloudFlare | CF 三层绕过（见下文） |
 | 响应 <200字节 + 仅含 `<script>` | JS 挑战页 | loginCheckJs 或 webView 模式（见下文） |
 | `content-length: 0` / 响应极短 | 空/异常页 | 检查请求头 / Referer / Cookie |
-| 响应中含 `验证码` / `captcha` | 验证码 | `java.ocr()` 或 `java.getVerificationCode()` |
+| 响应中含 `验证码` / `captcha` | 验证码 | `java.getVerificationCode()` 手动输入 |
 | 响应含加密数据 | 加密/签名 | 调网页函数抓参数 |
 
 ## 2. 基础防护（所有站点优先尝试）
@@ -180,9 +180,6 @@ java.HMacHex(data, "HmacSHA256", key);  // HMAC
 ## 8. 验证码
 
 ```js
-// 自动识别（字母数字）
-const code = java.ocr(captchaUrl);
-
-// 手动弹窗
+// 手动弹窗，用户肉眼输入
 const code = java.getVerificationCode(captchaUrl);
 ```

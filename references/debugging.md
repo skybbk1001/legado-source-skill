@@ -108,7 +108,7 @@ java.logType(variable);
 | 浏览器能开、App 不能 | cookie/session，`enabledCookieJar: true` 或 WebView |
 | WebView 失败 | 后备到 `startBrowser` 手动 |
 | 频繁被封 IP | `concurrentRate` 调大 |
-| 验证码 | `java.ocr()` 或 `java.getVerificationCode()` |
+| 验证码 | `java.getVerificationCode()` 手动输入 |
 
 ### 登录
 

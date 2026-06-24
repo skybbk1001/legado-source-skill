@@ -14,11 +14,13 @@
 | `enabledExplore` |  | 开启"发现"页 |
 | `enabledCookieJar` |  | 登录/session 站点需 true |
 | `header` |  | 全局请求头 JSON 字符串 |
-| `concurrentRate` |  | 请求间隔，直接写毫秒数：`"1000"`=每次请求间隔 ≥1s。`"N/M"` 格式仅在 N>1 时使用（如 `"3/1000"`=每 1 秒最多 3 次）。**不要写 `"1/1000"`**，等同于 `"1000"` |
+| `concurrentRate` |  | 字符串。`"1000"`=每次请求间隔 ≥1s（最小间隔模式）；`"N/M"`=每 M 毫秒最多 N 次（如 `"3/1000"`）；`"0"`/空=不限流。单次限流优先写 `"1000"` 而非 `"1/1000"`（后者走计数窗口逻辑，效果相近但非同一路径） |
 | `bookUrlPattern` |  | 详情页 URL 正则（外部链接识别） |
 | `jsLib` |  | 共享 JS 库（多规则复用函数），**无 java/cache/cookie 等全局变量，用 this 解构** |
 | `loginUrl` / `loginUi` / `loginCheckJs` |  | 登录三件套，见 [[references/anti-bot.md]] |
-| `coverDecodeJs` |  | 封面解密 JS |
+| `coverDecodeJs` |  | 封面解密 JS：`result`=封面 InputStream、`src`=图片 URL，须返回 ByteArray。见 [[references/js-api.md]] §封面解密 |
+| `variableComment` |  | 自定义变量说明（变量设置 UI 显示） |
+| `exploreScreen` |  | 发现页筛选规则（动态筛选条件） |
 | `eventListener` + `customButton` |  | 事件回调，见 [[references/js-api.md]] §callBackJs |
 | `ruleExplore` + `exploreUrl` |  | 发现页，详见下文 §发现 |
 | `ruleSearch` / `ruleBookInfo` / `ruleToc` / `ruleContent` | ✓ | 四类规则对象，见下文 |
@@ -113,41 +115,39 @@
 
 ## 发现 `ruleExplore` + `exploreUrl`
 
-`exploreUrl` 定义分类入口，有三种写法：
-
-| 格式 | 示例 | 适用场景 |
-|------|------|----------|
-| JSON 数组 | `[{"title":"玄幻","url":"https://x.com/xh"}]` | 通用 |
-| JS 生成 | `<js>...</js>` 返回 JSON 数组字符串 | 分类需动态抓取、带分区头、带 style |
-| 文本格式（旧） | `玄幻::https://x.com/xh&&都市::https://x.com/ds` | 简单站点，快速手写 |
+`exploreUrl` 用 `<js>` 写：返回一个 JSON 数组字符串，每项是一个分类条目。动态抓站点分类、加分区头和网格样式都靠 JS。
 
 每个条目字段：
 
 | 字段 | 必填 | 说明 |
 |------|------|------|
 | `title` | ✓ | 分类显示名。分区头可用装饰字符如 `▱▱▱▱男生▱▱▱▱` |
-| `url` |  | 分类页 URL。分区头可不传 |
+| `url` |  | 分类页 URL，支持 `{{page}}`、`<page1,page2>`、URL 选项（POST/headers/webView）。分区头可不传 |
 | `style` |  | Yoga Layout 样式，**值均为字符串**。分区头用 `{"layout_flexBasisPercent":"1"}` 占满整行；子分类用 `{"layout_flexBasisPercent":"0.25","layout_flexGrow":"1"}` 四列自适应 |
-
-`exploreUrl` 中的每个 URL 跟 `searchUrl` 一样支持 `{{page}}`、`<page1,page2>`、URL 选项（POST/headers/webView）。
 
 `ruleExplore` 结构与 `ruleSearch` **完全相同**，仅无 `checkKeyWord`。若 `ruleExplore.bookList` 为空，引擎自动回退使用 `ruleSearch`。
 
-### 动态发现示例（JS 生成 + 分区头 + style）
+### 固定分类（JS 返回字面数组）
 
 ```js
-// exploreUrl 用 <js> 动态抓分类，区分区头(占满行)和子项(四列)
+<js>JSON.stringify([
+  {title:'玄幻', url:'https://x.com/sort/1/<1,2,3>'},
+  {title:'都市', url:'https://x.com/sort/2/<1,2,3>'}
+])</js>
+```
+
+### 动态分类（抓站点分类 + 分区头 + style）
+
+```js
+// 动态抓分类，区分区头(占满行)和子项(四列)
 let src = org.jsoup.Jsoup.parse(java.ajax('https://www.qidian.com/all/'));
 let list = [];
 let addItem = (title, url, flexBasis) => {
   list.push({ title, url, style: { layout_flexGrow: '1', layout_flexBasisPercent: flexBasis } });
 };
-
-// 分区头：flexBasis = '1' (100%宽度)
-addItem('▱▱▱▱男生▱▱▱▱', null, '1');
-// 子分类：flexBasis = '0.25' (25%宽度，4列)
+addItem('▱▱▱▱男生▱▱▱▱', null, '1');                 // 分区头：100% 宽
 src.select('.type-filter').get(1).select('a').forEach(el => {
-  addItem(el.text(), 'https:' + el.attr('href'), '0.25');
+  addItem(el.text(), 'https:' + el.attr('href'), '0.25'); // 子分类：25% 宽，4列
 });
 JSON.stringify(list);
 ```

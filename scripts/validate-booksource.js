@@ -7,7 +7,7 @@ const VALID_TOP = new Set([
   'bookSourceUrl','bookSourceName','bookSourceType','bookSourceComment','bookSourceGroup',
   'bookUrlPattern','enabled','enabledExplore','enabledCookieJar',
   'header','concurrentRate','jsLib','loginUrl','loginUi','loginCheckJs',
-  'coverDecodeJs','eventListener','customButton','customOrder',
+  'coverDecodeJs','eventListener','customButton','customOrder','variableComment','exploreScreen',
   'searchUrl','weight','respondTime','lastUpdateTime',
   'ruleSearch','ruleBookInfo','ruleToc','ruleContent','ruleReview','ruleExplore','exploreUrl',
 ]);
@@ -72,7 +72,7 @@ const VALID_JAVA_APIS = new Set([
   'java.encodeURI','java.t2s','java.s2t','java.htmlFormat',
   'java.toURL',
   'java.strToBytes','java.bytesToStr',
-  'java.ocr','java.getVerificationCode',
+  'java.getVerificationCode',
   'java.queryTTF','java.replaceFont',
   'java.put','java.get',
   'java.downloadFile','java.readTxtFile','java.deleteFile','java.getFile','java.readFile',
@@ -90,6 +90,7 @@ const VALID_JAVA_APIS = new Set([
   'java.timeFormat','java.timeFormatUTC',
   'java.refreshTocUrl','java.reGetBook',
   'java.initUrl','java.getStrResponse',
+  'java.singleFlight','java.lock','java.tick','java.getCookie',
 ]);
 
 // ── 浏览器API（仅webView/webJs上下文可用）──

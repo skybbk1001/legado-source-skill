@@ -42,15 +42,15 @@ Rhino 支持大部分 ES6+：
 | `result` | Any | 所有规则（上一步的输出） |
 | `src` | String | 所有规则（原始页面源码） |
 | `baseUrl` | String | 所有规则（当前页面 URL） |
-| `book` | Book? | 书籍信息、目录、正文规则 |
-| `chapter` | BookChapter? | 正文规则 |
+| `book` | BaseBook? | 详情/目录/正文规则（AnalyzeUrl 上下文中为 Book?，RSS 中为 null） |
+| `chapter` | BookChapter? | 目录/正文规则 |
 | `source` | BaseSource | 所有规则 |
 | `title` | String | 正文规则（当前章节标题） |
 | `nextChapterUrl` | String? | 正文规则（翻页正文） |
 | `cookie` | CookieStore | 所有规则 |
 | `cache` | CacheManager | 所有规则 |
-| `key` | String? | 搜索规则 + loginCheckJs（搜索外为 null） |
-| `page` | Int | 搜索/目录规则（当前页码） |
+| `key` | String? | URL 规则（searchUrl 等）+ loginCheckJs；普通解析规则中未定义 |
+| `page` | Int | 所有 AnalyzeRule 规则（默认 1）+ URL 规则 |
 
 规则 JS 中 `java` 是 `AnalyzeRule`。`loginCheckJs` 中是 `AnalyzeUrl`，额外可访问 `java.url`（当前请求 URL）、`java.ruleUrl`（原始规则 URL）、`java.initUrl()`、`java.getStrResponse()`。
 
@@ -62,6 +62,7 @@ java.ajaxAll(urlList: Array<String>): Array<StrResponse>
 
 //返回StrResponse 方法body() code() message() headers() raw() toString() 
 java.connect(urlStr): StrResponse
+java.connect(urlStr, headerJson): StrResponse        // 带请求头（JSON 字符串）
 
 // GET 带请求头（不跟随跳转）→ Connection.Response
 java.get(url, { Referer: "..." });               // Map
@@ -185,19 +186,13 @@ java.bytesToStr(bytes);              // ByteArray → String
 ## 图片与字体
 
 ```js
-// OCR（中文模型）
-java.ocr(url);                       // 标准
-java.ocr(url, "raw");               // raw
-java.ocr(url, "line");              // 行分割
-java.ocr(url, "captcha");           // 验证码（仅字母数字）
-
-// 手动验证码弹窗
+// 验证码手动弹窗（用户肉眼输入）
 java.getVerificationCode(imageUrl);
 
 // 字体反爬
-const f1 = java.queryTTF(base64FontData);
+const f1 = java.queryTTF(base64FontData);          // 第二参 useCache:Boolean 可选
 const f2 = java.queryTTF("https://example.com/font.ttf");
-java.replaceFont(result, f1, f2, true);  // true = 过滤无映射字形
+java.replaceFont(result, f1, f2, true);  // 第四参 filter=true 过滤无映射字形
 ```
 
 ## 存储与缓存
@@ -213,7 +208,7 @@ cookie.getKey(url, "session_id");
 cookie.setCookie(url, "key=value");
 cookie.removeCookie(url);
 
-// 持久缓存（数据库，50MB）
+// 持久缓存（数据库，无大小上限；saveTime 单位秒，0=永不过期）
 cache.put(key, value, saveTimeSeconds);
 cache.get(key);
 cache.delete(key);
@@ -222,10 +217,30 @@ cache.delete(key);
 cache.putFile(key, value, saveTimeSeconds);
 cache.getFile(key);
 
-// 内存缓存（仅会话）
+// 内存缓存（仅会话，LruCache 上限 50MB）
 cache.putMemory(key, value);
 cache.getFromMemory(key);
 ```
+
+## 并发与限流（本分支新增）
+
+多账号轮换、合并重复请求、读改写共享配额时用。键以书源为作用域。
+
+```js
+// 单飞合并：同 name 并发只有 leader 执行 action，其余等待后跳过并取 leader 结果
+java.singleFlight(name, () => java.ajax(url));          // 默认超时 15000ms
+java.singleFlight(name, action, 8000);
+
+// 互斥锁：同 name 串行，每个调用都执行（用于读-改-写，如扣减配额）
+java.lock(name, () => { /* 临界区 */ });
+
+// 原子轮询计数：进程内自增，返回自增前非负序号（到 Int.MAX 回绕），多账号取模轮换
+const i = java.tick("account");
+const account = accounts[i % accounts.length];
+```
+
+- 等待超过 timeoutMs（默认 15000）抛异常。
+- `action` 以自身 parentScope 为 this 运行：内联函数无碍；**定义在 jsLib 里的 action 取不到 book/source/java**，需 `() => fn.call(this)` 或 `fn.bind(this)` 把 this 绑到执行环境，再经 this 取用。
 
 ## 文件操作
 
@@ -271,7 +286,7 @@ java.logType(variable);              // 输出类型和值
 java.startBrowser(url, "Title");     // 内置浏览器，不等结果
 java.startBrowserAwait(url, "Title"); // 浏览器，等结果 → StrResponse
 java.startBrowserAwait(url, title, refetchAfterSuccess); // 第三参数控制是否自动重新获取
-java.showBrowser(url, html?, preloadJs?, config?); // 显示内置浏览器，用户手动操作
+java.showBrowser(url, html?, preloadJs?, config?); // 内置浏览器供用户手动操作；config 为 JSON 字符串（如 {"expandedHeight":600}）
 java.openUrl(url);                   // 外部浏览器
 java.openUrl(url, mimeType);         // 带 MIME 类型提示打开
 java.copyText(text);                 // 复制到剪贴板
@@ -380,6 +395,18 @@ function decodeImage(data, key) {
 decodeImage(result, key);
 ```
 
+### 封面解密（coverDecodeJs）
+
+绑定 `result`=封面原始字节流 InputStream、`src`=图片 URL、`book`；**必须返回 ByteArray**。
+
+```js
+(() => {
+  const out = new java.io.ByteArrayOutputStream();
+  let b; while ((b = result.read()) !== -1) out.write(b);
+  return java.createSymmetricCrypto("AES/CBC/PKCS5Padding", key, iv).decrypt(out.toByteArray());
+})();
+```
+
 ### 字体反爬（replaceRegex）
 
 ```js
@@ -396,19 +423,28 @@ decodeImage(result, key);
 </js>
 ```
 
-### 回调事件（callBackJs，需 eventListener:true）
+### 回调事件（ruleContent.callBackJs，需顶层 `eventListener:true`）
+
+绑定 `event`(事件名)、`result`、`book`、`chapter`；`java` 仅在自定义按钮事件中可用。
+按钮事件返回 `true` 拦截默认动作，否则执行默认；其余事件返回值被忽略。
 
 ```js
 (function() {
+  // 自定义按钮事件（customButton:true 时显示按钮），java.* 可用
   if (event === "clickCustomButton") {
-    java.startBrowser(`https://example.com/chapter?id=${chapter?.index}`);
+    java.startBrowser(`https://example.com/chapter?id=${chapter?.index}`, "章节");
+    return true;   // 拦截默认动作
   }
+  // 其它事件：返回值被忽略，只能改 result
   if (event === "clickShareBook") {
     result = String(result).replace(/广告/g, "");
-    return false;  // 不拦截默认行为
   }
 })();
 ```
+
+常用 `event` 值：`clickAuthor` `clickBookName` `clickCustomButton` `longClickCustomButton`
+`clickShareBook` `clickClearCache` `clickCopyBookUrl` `clickCopyTocUrl` `addBookShelf`
+`delBookShelf` `saveRead` `startRead` `endRead` `startShelfRefresh` `endShelfRefresh`。
 
 ### 时间格式化
 

@@ -1,6 +1,6 @@
 # 规则语法参考
 
-Legado 规则主要使用三种模式：**JSoup/CSS**（默认，HTML 页面）、**JsonPath**（JSON API）和 **JavaScript**（复杂逻辑）。另有 XPath（`//` 前缀）和 Regex（`:` 前缀）两种模式，极少用到。
+Legado 规则主要使用三种模式：**JSoup/CSS**（默认，HTML 页面）、**JsonPath**（JSON API）和 **JavaScript**（复杂逻辑）。另有 XPath（`/` 或 `@XPath:` 前缀）和 Regex（`:` 前缀，仅在 bookList/chapterList 等列表规则中生效）两种模式，极少用到。
 
 
 ## 1. JSoup/CSS 选择器（默认模式）
@@ -27,7 +27,7 @@ div.item.2              → 第 3 个 div.item
 div.item.-1             → 最后一个 div.item
 div.item!0              → 排除第 1 个（即第 2 个起）
 div.item!0:1            → 排除第 1、2 个
-div.item[0:5]           → 前 5 个（索引 0~4）
+div.item[0:5]           → 索引 0~5 共 6 个（end 含端点，与 JsonPath 切片的 exclusive 不同）
 div.item[3:]            → 第 4 个起
 ```
 
@@ -263,6 +263,14 @@ https://www.example.com/search?keyword={{key}}&page={{page}}
 
 `{{key}}` 自动 URL 编码。`{{page}}` 从 1 开始递增。
 
+### 多格式翻页 `<v1,v2,...>`
+
+URL 中 `<a,b,c>` 按页码取值：第 1 页取 a、第 2 页取 b……超出取最后一个。用于首页与后续页 URL 格式不一致、或页码非简单递增的站点。
+
+```
+https://api.x.com/list?type=1&page=<1,2,3>   → 第1/2/3页取 1/2/3，第4页起固定 3
+https://x.com/sort/1<,_2,_3>.html            → 第1页 /sort/1.html，第2页 /sort/1_2.html
+```
 
 ### URL 选项
 
@@ -270,7 +278,12 @@ https://www.example.com/search?keyword={{key}}&page={{page}}
 https://example.com/api,{"method":"POST","body":"q=搜索","headers":{"X-Key":"v"},"timeout":5000}
 ```
 
-选项：`method` `body` `headers` `webView` `timeout` `retry` `followRedirects` `resolveIp` `js`
+选项：`method` `body` `headers` `charset` `type` `webView` `webJs` `timeout` `retry` `followRedirects` `resolveIp` `js`
+
+常用补充：
+- `charset` — 表单/查询编码（非 UTF-8 站点写 `"gbk"` 等；特殊值 `"escape"` 用 %XX 转义）
+- `type` — 强制响应类型（如图片走 byte/hex）
+- `webJs` — 在 webView 内执行的 JS（配合 `"webView":true`）
 
 ### 图片请求头
 
@@ -319,7 +332,7 @@ let opts = {"headers": {"Referer": baseUrl}};
 
 ## 7. 其他模式
 
-`//` 或 `@XPath:` 触发 XPath，`:` 前缀触发 Regex 列表。极少用。
+`/` 或 `@XPath:` 触发 XPath，`:` 前缀在列表规则（bookList/chapterList）中触发 Regex。极少用。
 
 ## 8. 站点模板
 

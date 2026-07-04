@@ -117,8 +117,9 @@ const BROWSER_GLOBALS = [
 
 // ── Rhino不兼容语法 ──
 const RHINO_CHECKS = [
-  { pattern: /\basync\s+(function|\(|\w+\s*\()/, severity: 'error', msg: 'async/await — Rhino不支持，用Promise链' },
-  { pattern: /\bawait\s+/, severity: 'error', msg: 'await — Rhino不支持，用.then()' },
+  { pattern: /\basync\s+(function|\(|\w+\s*\()/, severity: 'error', msg: 'async/await — Rhino不支持，改同步写法(java.ajax等本就是同步)' },
+  { pattern: /\bawait\s+/, severity: 'error', msg: 'await — Rhino不支持，改同步写法' },
+  { pattern: /\.then\s*\(/, severity: 'error', msg: 'Promise链 — 引擎无事件循环，then回调不执行，改同步写法' },
   { pattern: /\bclass\s+[A-Za-z_$]/, severity: 'error', msg: 'ES6 class — Rhino不支持，用function+prototype' },
   { pattern: /\.\.\.\s*(arr|args|[a-zA-Z_$]\w*)\s*\)/, severity: 'error', msg: '函数调用展开(...args) — 用fn.apply(null, arr)' },
   { pattern: /for\s*\(\s*(let|const|var)\s+\w+\s+of\s+/, severity: 'warning', msg: 'for...of在Java List上可能失败 — 用list.size()+list.get(i)' },

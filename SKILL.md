@@ -25,15 +25,17 @@ AI：使用curl、Playwright MCP（DOM、Network XHR）、Nodejs、读文件等�
 ## 源格式二选一（新建源的第一步）
 
 新建源时先让用户在两种格式中选择，再开始侦察；用户已指明格式则跳过，调试既有源沿用其格式。
-用户不确定或让你决定时：默认声明式 JSON 源；侦察后发现强加密/多步请求拼装再建议切 JS 源。
+**推荐并默认纯JS单文件源**：命令式 JS 比规则 DSL 出错面小（无规则链/切片/对位等隐性语义），
+Phase 4 验证逻辑可直迁函数体，校验器可实际执行脚本。用户需要与原版 legado 生态互通、
+或需要发现页时选声明式 JSON 源。
 
-| | 声明式 JSON 源 | 纯JS单文件源（仅本 fork） |
+| | 纯JS单文件源（推荐，仅本 fork） | 声明式 JSON 源 |
 |---|---|---|
-| 形态 | 规则字段 DSL（CSS/XPath/JsonPath + 内嵌JS） | 一个 `.js` 文件，`search`/`getChapters`/`getContent` 函数 |
-| 适合 | 常规 HTML/JSON 站点；需与原版 legado 生态互通 | 强加密/签名、多步请求拼装、复杂翻页；整段逻辑自由 |
-| 解析手段 | 规则选择器 + `java.getString` 等 | `org.jsoup.Jsoup.parse` / `JSON.parse` / 正则 |
-| 发现页 | 支持 | 无 |
-| 契约参考 | [[references/fields.md]] | [[references/js-source-format.md]] |
+| 形态 | 一个 `.js` 文件，`search`/`getChapters`/`getContent` 函数 | 规则字段 DSL（CSS/XPath/JsonPath + 内嵌JS） |
+| 适合 | 默认选择；强加密/多步拼装/复杂翻页尤其适合 | 需与原版 legado 生态互通；需要发现页 |
+| 解析手段 | `org.jsoup.Jsoup.parse` / `JSON.parse` / 正则 | 规则选择器 + `java.getString` 等 |
+| 发现页 | 无 | 支持 |
+| 契约参考 | [[references/js-source-format.md]] | [[references/fields.md]] |
 
 Phase 1-4（侦察/采集/分析/验证）与格式无关，照常执行；Phase 5/6 按格式分叉。
 
@@ -144,6 +146,8 @@ node tmp/verify.js
 
 **反爬：** 按 Phase 1/2 记录的 Level 查 [[references/anti-bot.md]] 配置对应字段（L0=仅 UA、L1=+Referer+CookieJar、L2=+webView、L3=+startBrowserAwait）。
 
+**纯JS单文件源（推荐）**：按 [[references/js-source-format.md]] 写 `.js`（source 配置 → search → getBookInfo → getChapters → getContent）。Phase 4 `tmp/verify.js` 验证过的解析逻辑逐行迁移进函数体（`fetch`→`java.ajax`、`cheerio`→`org.jsoup`，映射表见该参考文末）。
+
 **声明式 JSON 源**：从 [[references/fields.md]] 预填充字段，写源过程中查看 [[references/rule-syntax.md]] 和 [[references/js-api.md]]。按数据流顺序实现：
 1. 基础字段（bookSourceUrl, header, enabledCookieJar 等）
 2. 搜索（searchUrl + ruleSearch，含翻页）
@@ -151,8 +155,6 @@ node tmp/verify.js
 4. 目录（ruleToc，含翻页）
 5. 正文（ruleContent，含翻页）
 6. 发现（exploreUrl + ruleExplore）
-
-**纯JS单文件源**：按 [[references/js-source-format.md]] 写 `.js`（source 配置 → search → getBookInfo → getChapters → getContent）。Phase 4 `tmp/verify.js` 验证过的解析逻辑逐行迁移进函数体（`fetch`→`java.ajax`、`cheerio`→`org.jsoup`，映射表见该参考文末）。
 
 ---
 

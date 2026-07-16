@@ -4,6 +4,7 @@
 //       source 必填键与类型 / 必备函数存在 / 剥除键与用户态键提示
 const fs = require('fs');
 const vm = require('vm');
+const { stripAll, rhinoIssues } = require('./rhino-checks.js');
 
 // ── JS 源上下文的 java = JsExtensions(+JsEncodeUtils) ──
 const VALID_JAVA_APIS = new Set([
@@ -59,36 +60,6 @@ const INERT_KEYS = new Set([
   'searchUrl','exploreUrl','exploreScreen',                        // 声明式管道,JS 源不走
 ]);
 
-const REQUIRED_FUNCTIONS = ['search', 'getChapters', 'getContent'];
-
-// ── Rhino 不兼容语法(JsTest.es6CompatBoundary 口径) ──
-const RHINO_CHECKS = [
-  { pattern: /\basync\s+(function|\(|\w+\s*\()/, msg: 'async/await — Rhino不支持,java.ajax 等本就是同步' },
-  { pattern: /\bawait\s+/, msg: 'await — Rhino不支持' },
-  { pattern: /\.then\s*\(/, msg: 'Promise回调 — 引擎无事件循环,回调不执行' },
-  { pattern: /\bclass\s+[A-Za-z_$]/, msg: 'ES6 class — Rhino不支持,用 function+prototype' },
-  { pattern: /\(\s*\.\.\./, msg: '函数调用展开 f(...arr) — 用 fn.apply(null, arr);数组字面量展开 [...arr] 可用' },
-  { pattern: /,\s*\.\.\.[A-Za-z_$]\w*\s*\]/, msg: '数组剩余解构 [a, ...b] — 用 arr.slice(1)' },
-];
-
-function stripComments(code) {
-  return code.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
-}
-function stripStrings(code) {
-  return code
-    .replace(/"[^"\\]*(?:\\.[^"\\]*)*"/g, '""')
-    .replace(/'[^'\\]*(?:\\.[^'\\]*)*'/g, "''")
-    .replace(/`[^`\\]*(?:\\.[^`\\]*)*`/g, '``');
-}
-function stripRegex(code) {
-  return code.replace(/\/[^\/\n\\]*(?:\\.[^\/\n\\]*)*\/[gimsuy]*/g, '""');
-}
-function stripAll(code) { return stripComments(stripRegex(stripStrings(code))); }
-
-function lineAt(code, pos) {
-  return code.slice(0, pos).split('\n').length;
-}
-
 function main() {
   const file = process.argv[2];
   if (!file) {
@@ -105,11 +76,10 @@ function main() {
     process.exit(1);
   }
 
-  // 2. Rhino 不兼容语法
+  // 2. Rhino 不兼容语法(共享检查器,展开语法按括号上下文分类)
   const clean = stripAll(text);
-  for (const { pattern, msg } of RHINO_CHECKS) {
-    const m = pattern.exec(clean);
-    if (m) errors.push(`line ${lineAt(clean, m.index)}: ${msg}`);
+  for (const { line, msg } of rhinoIssues(text)) {
+    errors.push(`line ${line}: ${msg}`);
   }
 
   // 3. java.* API 面

@@ -28,7 +28,7 @@ curl -i -A 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36' \
 
 ### 4. 让用户在 App 里实测（你无法做）
 
-交付 JSON 时同时请他们反馈结果
+交付书源（JSON / `.js`）时同时请他们反馈结果
 
 ### 5. JS 运行时值（用户帮忙打）
 

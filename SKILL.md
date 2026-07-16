@@ -25,6 +25,7 @@ AI：使用curl、Playwright MCP（DOM、Network XHR）、Nodejs、读文件等�
 ## 源格式二选一（新建源的第一步）
 
 新建源时先让用户在两种格式中选择，再开始侦察；用户已指明格式则跳过，调试既有源沿用其格式。
+用户不确定或让你决定时：默认声明式 JSON 源；侦察后发现强加密/多步请求拼装再建议切 JS 源。
 
 | | 声明式 JSON 源 | 纯JS单文件源（仅本 fork） |
 |---|---|---|
@@ -157,13 +158,14 @@ node tmp/verify.js
 
 ### Phase 6: 语法验证
 
-**目标：** 检查源的结构、JS 语法和字段名合法性。
+**目标：** 检查源的结构、JS 语法和字段名合法性。脚本在本 skill 的 `scripts/` 目录
+（[[scripts/validate-booksource.js]] / [[scripts/validate-jssource.js]]），从其他工作目录调用时写完整路径。
 
 ```bash
 # 声明式 JSON 源
-node scripts/validate-booksource.js path/to/booksource.json
+node <skill目录>/scripts/validate-booksource.js path/to/booksource.json
 # 纯JS单文件源
-node scripts/validate-jssource.js path/to/source.js
+node <skill目录>/scripts/validate-jssource.js path/to/source.js
 ```
 
 JSON 源检查：必填字段是否缺失、`@js:` / `<js>` 块用 `vm.Script` 原样编译（与 Legado 一致）是否有语法错误、字段名是否在 [[references/fields.md]] 合法范围内。

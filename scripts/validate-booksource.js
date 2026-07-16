@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const vm = require('vm');
+const { rhinoIssues } = require('./rhino-checks.js');
 
 // ── 合法字段名 ──
 const VALID_TOP = new Set([
@@ -115,16 +116,6 @@ const BROWSER_GLOBALS = [
   'atob','btoa','Image',
 ];
 
-// ── Rhino不兼容语法 ──
-const RHINO_CHECKS = [
-  { pattern: /\basync\s+(function|\(|\w+\s*\()/, severity: 'error', msg: 'async/await — Rhino不支持，改同步写法(java.ajax等本就是同步)' },
-  { pattern: /\bawait\s+/, severity: 'error', msg: 'await — Rhino不支持，改同步写法' },
-  { pattern: /\.then\s*\(/, severity: 'error', msg: 'Promise链 — 引擎无事件循环，then回调不执行，改同步写法' },
-  { pattern: /\bclass\s+[A-Za-z_$]/, severity: 'error', msg: 'ES6 class — Rhino不支持，用function+prototype' },
-  { pattern: /\.\.\.\s*(arr|args|[a-zA-Z_$]\w*)\s*\)/, severity: 'error', msg: '函数调用展开(...args) — 用fn.apply(null, arr)' },
-  { pattern: /for\s*\(\s*(let|const|var)\s+\w+\s+of\s+/, severity: 'warning', msg: 'for...of在Java List上可能失败 — 用list.size()+list.get(i)' },
-];
-
 // ── 工具函数 ──
 function stripComments(code) {
   return code.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
@@ -188,17 +179,12 @@ function extractJsBlocks(obj, path = '') {
 }
 
 // ── 检查器 ──
+// Rhino 不兼容语法走共享检查器(rhino-checks.js):async/await/Promise回调/class,
+// 展开语法按括号上下文分类(剩余参数/字面量展开支持,调用展开/剩余解构不支持)
 function checkRhinoIssues(code) {
-  const issues = [];
-  const clean = stripAll(code);
-  for (const { pattern, severity, msg } of RHINO_CHECKS) {
-    const m = pattern.exec(clean);
-    if (m) {
-      const { lineNum, line } = lineAt(code, m.index);
-      issues.push({ severity, msg: `${msg}\n    → line ${lineNum}: ${line}` });
-    }
-  }
-  return issues;
+  return rhinoIssues(code).map(({ line, msg }) => ({
+    severity: 'error', msg: `${msg}\n    → line ${line}`,
+  }));
 }
 
 function checkJavaApis(code) {

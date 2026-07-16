@@ -52,6 +52,7 @@ Rhino 支持大部分 ES6+（下表 2026-07-04 经引擎探针实测；不支持
 | `page` | Int | 所有 AnalyzeRule 规则（默认 1）+ URL 规则 |
 
 规则 JS 中 `java` 是 `AnalyzeRule`。`loginCheckJs` 中是 `AnalyzeUrl`，额外可访问 `java.url`（当前请求 URL）、`java.ruleUrl`（原始规则 URL）、`java.initUrl()`、`java.getStrResponse()`。
+**纯JS单文件源中 `java` 是 `JsExtensions`**——本文档的 §解析辅助（getString/getElements 等）与 `java.put/get(key)` 变量存取在该上下文不存在，见 [[js-source-format.md]] §运行环境。
 
 ## 网络请求
 

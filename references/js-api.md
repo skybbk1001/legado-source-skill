@@ -14,7 +14,7 @@ function getBook(url) {
 
 ## ES6+ 兼容性
 
-Rhino 支持大部分 ES6+（下表 2026-07-04 经引擎探针实测，探针在 `app/src/test/.../JsTest.kt#es6CompatBoundary`）：
+Rhino 支持大部分 ES6+（下表 2026-07-04 经引擎探针实测；不支持项锚定 `app/src/test/.../JsTest.kt#es6CompatBoundary`，支持项 2026-07-16 起锚定同文件 `#es6SupportedFeatures`）：
 
 | ✅ 完全支持 | ❌ 不支持 | 替代方案 |
 |---|---|---|

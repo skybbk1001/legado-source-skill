@@ -1,8 +1,9 @@
 ---
 name: legado-book-source
 description: >
-  为开源阅读 Legado 编写和调试书源 JSON。触发词：写书源、创建书源、调试书源、
-  书源规则、legado source。用户提到网站爬取、章节获取、HTML/JSON转书源时也使用。
+  为开源阅读 Legado 编写和调试书源（声明式 JSON 源 / 纯JS单文件源）。触发词：写书源、
+  创建书源、调试书源、书源规则、JS书源、legado source。用户提到网站爬取、章节获取、
+  HTML/JSON转书源时也使用。
 user-invokable: true
 argument-hint: "[站点URL或描述]"
 ---
@@ -13,13 +14,27 @@ argument-hint: "[站点URL或描述]"
 
 AI：使用curl、Playwright MCP（DOM、Network XHR）、Nodejs、读文件等方法分析网站并制作书源。
 
-用户：导入 JSON 到 App 实测，反馈现象（截图、报错、章节缺失）。
+用户：导入书源到 App 实测，反馈现象（截图、报错、章节缺失）。
 
 ## 核心原则
 
 1. 实事求是 — 靠推理写源，不猜测
 2. API 优先 — Playwright Network 看 XHR；JSON API 反爬弱
 3. 选择器唯一 — 抓完整HTML确保选择器唯一
+
+## 源格式二选一（新建源的第一步）
+
+新建源时先让用户在两种格式中选择，再开始侦察；用户已指明格式则跳过，调试既有源沿用其格式。
+
+| | 声明式 JSON 源 | 纯JS单文件源（仅本 fork） |
+|---|---|---|
+| 形态 | 规则字段 DSL（CSS/XPath/JsonPath + 内嵌JS） | 一个 `.js` 文件，`search`/`getChapters`/`getContent` 函数 |
+| 适合 | 常规 HTML/JSON 站点；需与原版 legado 生态互通 | 强加密/签名、多步请求拼装、复杂翻页；整段逻辑自由 |
+| 解析手段 | 规则选择器 + `java.getString` 等 | `org.jsoup.Jsoup.parse` / `JSON.parse` / 正则 |
+| 发现页 | 支持 | 无 |
+| 契约参考 | [[references/fields.md]] | [[references/js-source-format.md]] |
+
+Phase 1-4（侦察/采集/分析/验证）与格式无关，照常执行；Phase 5/6 按格式分叉。
 
 ## 工作流
 
@@ -128,7 +143,7 @@ node tmp/verify.js
 
 **反爬：** 按 Phase 1/2 记录的 Level 查 [[references/anti-bot.md]] 配置对应字段（L0=仅 UA、L1=+Referer+CookieJar、L2=+webView、L3=+startBrowserAwait）。
 
-从 [[references/fields.md]] 预填充字段，写源过程中查看 [[references/rule-syntax.md]] 和 [[references/js-api.md]]。按数据流顺序实现：
+**声明式 JSON 源**：从 [[references/fields.md]] 预填充字段，写源过程中查看 [[references/rule-syntax.md]] 和 [[references/js-api.md]]。按数据流顺序实现：
 1. 基础字段（bookSourceUrl, header, enabledCookieJar 等）
 2. 搜索（searchUrl + ruleSearch，含翻页）
 3. 详情（ruleBookInfo）
@@ -136,19 +151,25 @@ node tmp/verify.js
 5. 正文（ruleContent，含翻页）
 6. 发现（exploreUrl + ruleExplore）
 
+**纯JS单文件源**：按 [[references/js-source-format.md]] 写 `.js`（source 配置 → search → getBookInfo → getChapters → getContent）。Phase 4 `tmp/verify.js` 验证过的解析逻辑逐行迁移进函数体（`fetch`→`java.ajax`、`cheerio`→`org.jsoup`，映射表见该参考文末）。
+
 ---
 
 ### Phase 6: 语法验证
 
-**目标：** 检查书源 JSON 的结构、JS 语法和字段名合法性。脚本在[[scripts/validate-booksource.js]]
+**目标：** 检查源的结构、JS 语法和字段名合法性。
 
 ```bash
+# 声明式 JSON 源
 node scripts/validate-booksource.js path/to/booksource.json
+# 纯JS单文件源
+node scripts/validate-jssource.js path/to/source.js
 ```
 
-脚本检查：必填字段是否缺失、`@js:` / `<js>` 块用 `vm.Script` 原样编译（与 Legado 一致）是否有语法错误、字段名是否在 [[references/fields.md]] 合法范围内。
+JSON 源检查：必填字段是否缺失、`@js:` / `<js>` 块用 `vm.Script` 原样编译（与 Legado 一致）是否有语法错误、字段名是否在 [[references/fields.md]] 合法范围内。
+JS 源检查：整文件语法、Rhino 不兼容语法、`java.*` 是否在 JsExtensions 面内、source 必填键与类型、三个必备函数存在。
 
-全部通过 → 交付书源，清理 `tmp/`。有报错 → 修正后重跑。
+全部通过 → 交付书源（JSON 或 `.js` 文件），清理 `tmp/`。有报错 → 修正后重跑。
 
 
 ## 实现选择（按场景跳转）
@@ -166,3 +187,4 @@ node scripts/validate-booksource.js path/to/booksource.json
 | 拿到 CF 验证页、JS 挑战页、403、需手动登录 | — | [[references/anti-bot.md]] |
 | 用户反馈：搜索空 / 字段空 / 死循环 / 乱码 / 图片不显示 | — | [[references/debugging.md]] |
 | 找具体站点类型起手骨架（HTML网页、JSON API、登录、漫画） | — | [[references/site-templates.md]] |
+| 纯JS单文件源：config 键、四函数契约、运行环境、迁移映射 | — | [[references/js-source-format.md]] |

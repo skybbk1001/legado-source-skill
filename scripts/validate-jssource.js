@@ -1,0 +1,176 @@
+#!/usr/bin/env node
+// 纯JS单文件书源校验: node scripts/validate-jssource.js <source.js>
+// 检查: 整文件语法 / Rhino 不兼容语法 / java.* 是否在 JsExtensions 面内 /
+//       source 必填键与类型 / 必备函数存在 / 剥除键与用户态键提示
+const fs = require('fs');
+const vm = require('vm');
+
+// ── JS 源上下文的 java = JsExtensions(+JsEncodeUtils) ──
+const VALID_JAVA_APIS = new Set([
+  'java.ajax','java.ajaxAll','java.connect','java.get','java.head','java.post',
+  'java.webView','java.webViewGetSource','java.webViewGetOverrideUrl',
+  'java.startBrowser','java.startBrowserAwait','java.openUrl','java.showBrowser',
+  'java.getVerificationCode','java.getCookie',
+  'java.importScript','java.cacheFile','java.downloadFile',
+  'java.getFile','java.readFile','java.readTxtFile','java.deleteFile',
+  'java.unzipFile','java.unrarFile','java.un7zFile','java.unArchiveFile','java.getTxtInFolder',
+  'java.getZipStringContent','java.getZipByteArrayContent',
+  'java.getRarStringContent','java.getRarByteArrayContent',
+  'java.get7zStringContent','java.get7zByteArrayContent',
+  'java.strToBytes','java.bytesToStr',
+  'java.base64Decode','java.base64DecodeToByteArray','java.base64Encode',
+  'java.hexDecodeToByteArray','java.hexDecodeToString','java.hexEncodeToString',
+  'java.md5Encode','java.md5Encode16','java.digestHex','java.digestBase64Str',
+  'java.HMacHex','java.HMacBase64',
+  'java.createSymmetricCrypto','java.createAsymmetricCrypto','java.createSign',
+  'java.timeFormat','java.timeFormatUTC','java.encodeURI','java.htmlFormat',
+  'java.t2s','java.s2t','java.toURL','java.getWebViewUA',
+  'java.queryTTF','java.queryBase64TTF','java.replaceFont','java.toNumChapter',
+  'java.toast','java.longToast','java.log','java.logType',
+  'java.randomUUID','java.androidId','java.copyText',
+  'java.singleFlight','java.lock','java.tick',
+]);
+
+// AnalyzeRule/AnalyzeUrl 专属,JS 源上下文不存在(java.get 双参 HTTP 形式仍有效,按名放行)
+const RULE_ONLY_APIS = new Set([
+  'java.getString','java.getStringList','java.setContent',
+  'java.getElement','java.getElements',
+  'java.put','java.reGetBook','java.refreshTocUrl',
+  'java.initUrl','java.getStrResponse','java.url','java.ruleUrl',
+]);
+
+// ── source 配置键 ──
+const REQUIRED_CONFIG = [
+  ['bookSourceUrl', 'error', '主键,缺失导入即报错'],
+  ['bookSourceName', 'error', '显示名,缺失导入即报错'],
+  ['bookSourceType', 'warning', '0文本 1音频 2图片 3下载站,缺省 0'],
+];
+const VALID_CONFIG_KEYS = new Set([
+  'bookSourceUrl','bookSourceName','bookSourceType','bookSourceComment','bookSourceGroup',
+  'bookUrlPattern','enabledCookieJar','header','concurrentRate','jsLib',
+  'loginUrl','loginUi','loginCheckJs','coverDecodeJs','eventListener','customButton',
+  'variableComment','lastUpdateTime',
+]);
+const STRIPPED_KEYS = new Set([
+  'mainJs','ruleSearch','ruleExplore','ruleBookInfo','ruleToc','ruleContent','ruleReview',
+]);
+const INERT_KEYS = new Set([
+  'enabled','enabledExplore','customOrder','weight','respondTime', // 用户态,应用维护
+  'searchUrl','exploreUrl','exploreScreen',                        // 声明式管道,JS 源不走
+]);
+
+const REQUIRED_FUNCTIONS = ['search', 'getChapters', 'getContent'];
+
+// ── Rhino 不兼容语法(JsTest.es6CompatBoundary 口径) ──
+const RHINO_CHECKS = [
+  { pattern: /\basync\s+(function|\(|\w+\s*\()/, msg: 'async/await — Rhino不支持,java.ajax 等本就是同步' },
+  { pattern: /\bawait\s+/, msg: 'await — Rhino不支持' },
+  { pattern: /\.then\s*\(/, msg: 'Promise回调 — 引擎无事件循环,回调不执行' },
+  { pattern: /\bclass\s+[A-Za-z_$]/, msg: 'ES6 class — Rhino不支持,用 function+prototype' },
+  { pattern: /\(\s*\.\.\./, msg: '函数调用展开 f(...arr) — 用 fn.apply(null, arr);数组字面量展开 [...arr] 可用' },
+  { pattern: /,\s*\.\.\.[A-Za-z_$]\w*\s*\]/, msg: '数组剩余解构 [a, ...b] — 用 arr.slice(1)' },
+];
+
+function stripComments(code) {
+  return code.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+}
+function stripStrings(code) {
+  return code
+    .replace(/"[^"\\]*(?:\\.[^"\\]*)*"/g, '""')
+    .replace(/'[^'\\]*(?:\\.[^'\\]*)*'/g, "''")
+    .replace(/`[^`\\]*(?:\\.[^`\\]*)*`/g, '``');
+}
+function stripRegex(code) {
+  return code.replace(/\/[^\/\n\\]*(?:\\.[^\/\n\\]*)*\/[gimsuy]*/g, '""');
+}
+function stripAll(code) { return stripComments(stripRegex(stripStrings(code))); }
+
+function lineAt(code, pos) {
+  return code.slice(0, pos).split('\n').length;
+}
+
+function main() {
+  const file = process.argv[2];
+  if (!file) {
+    console.error('用法: node validate-jssource.js <source.js>');
+    process.exit(1);
+  }
+  const text = fs.readFileSync(file, 'utf-8');
+  const errors = [];
+  const warnings = [];
+
+  // 1. 整文件语法
+  try { new vm.Script(text); } catch (e) {
+    console.error(`JS语法错误: ${e.message}`);
+    process.exit(1);
+  }
+
+  // 2. Rhino 不兼容语法
+  const clean = stripAll(text);
+  for (const { pattern, msg } of RHINO_CHECKS) {
+    const m = pattern.exec(clean);
+    if (m) errors.push(`line ${lineAt(clean, m.index)}: ${msg}`);
+  }
+
+  // 3. java.* API 面
+  for (const call of new Set(clean.match(/\bjava\.\w+/g) || [])) {
+    if (RULE_ONLY_APIS.has(call)) {
+      errors.push(`${call} — AnalyzeRule/AnalyzeUrl 专属,JS 源的 java=JsExtensions;` +
+        `HTML 解析用 org.jsoup.Jsoup.parse,变量用 cache 或 source.setVariable/getVariable`);
+    } else if (!VALID_JAVA_APIS.has(call)) {
+      errors.push(`未知 java API: ${call}`);
+    }
+  }
+
+  // 4. 执行顶层声明,提取 source 与函数(空沙箱:顶层出现运行时调用会在此暴露)
+  let probe;
+  try {
+    const context = vm.createContext({});
+    probe = vm.runInContext(
+      text + '\n;({ sourceType: typeof source,' +
+        ' fns: [typeof search, typeof getBookInfo, typeof getChapters, typeof getContent],' +
+        ' config: typeof source === "object" ? source : null })',
+      context, { timeout: 3000 });
+  } catch (e) {
+    errors.push(`顶层执行失败(顶层只放 source 与函数声明): ${e.message}`);
+  }
+
+  if (probe) {
+    if (probe.sourceType !== 'object') {
+      errors.push('缺少顶层 source 配置对象');
+    } else {
+      const config = probe.config;
+      for (const [key, severity, msg] of REQUIRED_CONFIG) {
+        if (config[key] === undefined || config[key] === '') {
+          (severity === 'error' ? errors : warnings).push(`source.${key} 缺失 — ${msg}`);
+        }
+      }
+      if (typeof config.bookSourceType === 'string') errors.push('bookSourceType 须是数字 0/1/2/3');
+      if (config.header !== undefined && typeof config.header !== 'string') errors.push('header 须是 JSON 字符串');
+      if (typeof config.concurrentRate === 'number') errors.push('concurrentRate 须是字符串');
+      for (const k of Object.keys(config)) {
+        if (STRIPPED_KEYS.has(k)) warnings.push(`source.${k} 在导入提取时被剥除,写了无效`);
+        else if (INERT_KEYS.has(k)) warnings.push(`source.${k} 对 JS 源不生效(用户态或声明式管道字段)`);
+        else if (!VALID_CONFIG_KEYS.has(k)) warnings.push(`source 未知键: ${k}`);
+      }
+    }
+    const [s, gbi, gc, gct] = probe.fns;
+    [['search', s], ['getChapters', gc], ['getContent', gct]].forEach(([name, t]) => {
+      if (t !== 'function') errors.push(`缺少必备函数 ${name}`);
+    });
+    if (gbi !== 'function') console.log('(getBookInfo 未定义 — 可选,详情沿用 search 阶段字段)');
+  }
+
+  if (errors.length) {
+    console.log(`\n❌ ${errors.length} 个错误:`);
+    errors.forEach(e => console.log(`  ✗ ${e}`));
+  }
+  if (warnings.length) {
+    console.log(`\n⚠️  ${warnings.length} 个警告:`);
+    warnings.forEach(w => console.log(`  ! ${w}`));
+  }
+  if (!errors.length && !warnings.length) console.log('✅ 全部通过');
+  process.exit(errors.length ? 1 : 0);
+}
+
+main();

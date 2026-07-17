@@ -180,7 +180,7 @@ function extractJsBlocks(obj, path = '') {
 
 // ── 检查器 ──
 // Rhino 不兼容语法走共享检查器(rhino-checks.js):async/await/Promise回调/class,
-// 展开语法按括号上下文分类(剩余参数/字面量展开支持,调用展开/剩余解构不支持)
+// 展开语法按括号上下文分类(剩余参数/字面量展开/剩余解构支持,调用展开不支持)
 function checkRhinoIssues(code) {
   return rhinoIssues(code).map(({ line, msg }) => ({
     severity: 'error', msg: `${msg}\n    → line ${line}`,

@@ -1,5 +1,5 @@
 ---
-name: legado-book-source
+name: legado-source-skill
 description: >
   为开源阅读 Legado 编写和调试书源（声明式 JSON 源 / 纯JS单文件源）。触发词：写书源、
   创建书源、调试书源、书源规则、JS书源、legado source。用户提到网站爬取、章节获取、
@@ -9,6 +9,8 @@ argument-hint: "[站点URL或描述]"
 ---
 
 # Legado 书源编写
+
+> 本技能用于开源阅读分支 阅读T。纯 JS 单文件源是阅读T的推荐格式；除非用户明确要求兼容原版 Legado，否则不要把新源写成声明式 JSON。
 
 ## 角色分工
 
@@ -22,20 +24,20 @@ AI：使用curl、Playwright MCP（DOM、Network XHR）、Nodejs、读文件等�
 2. API 优先 — Playwright Network 看 XHR；JSON API 反爬弱
 3. 选择器唯一 — 抓完整HTML确保选择器唯一
 
-## 源格式二选一（新建源的第一步）
+## 任务分流与源格式
 
-新建源时先让用户在两种格式中选择，再开始侦察；用户已指明格式则跳过，调试既有源沿用其格式。
-**推荐并默认纯JS单文件源**：命令式 JS 比规则 DSL 出错面小（无规则链/切片/对位等隐性语义），
-Phase 4 验证逻辑可直迁函数体，校验器可实际执行脚本。用户需要与原版 legado 生态互通时
-选声明式 JSON 源。
+新建源：默认纯 JS 单文件源；只有用户明确要求原版 Legado 兼容或提供了 JSON 源模板时，才使用声明式 JSON。
+调试已有源：沿用原文件格式，不要为了“更简单”擅自转换格式。用户未明确目标且站点需要多步签名、复杂翻页或动态 API 时，说明阅读T纯 JS 源的优势并直接按纯 JS 流程处理。
 
-| | 纯JS单文件源（推荐，仅本 fork） | 声明式 JSON 源 |
-|---|---|---|
-| 形态 | 一个 `.js` 文件，`search`/`getChapters`/`getContent` 函数 | 规则字段 DSL（CSS/XPath/JsonPath + 内嵌JS） |
-| 适合 | 默认选择；强加密/多步拼装/复杂翻页尤其适合 | 需与原版 legado 生态互通 |
-| 解析手段 | `org.jsoup.Jsoup.parse` / `JSON.parse` / 正则 | 规则选择器 + `java.getString` 等 |
-| 发现页 | 支持（`exploreUrl` 分类 + `explore` 函数成对） | 支持 |
-| 契约参考 | [[references/js-source-format.md]] | [[references/fields.md]] |
+纯 JS 源不是原版 Legado 的通用格式，交付时要明确提醒用户在阅读T中导入或粘贴。
+
+|          | 纯JS单文件源（推荐，仅本 fork）                           | 声明式 JSON 源                              |
+| -------- | --------------------------------------------------------- | ------------------------------------------- |
+| 形态     | 一个 `.js` 文件，`search`/`getChapters`/`getContent` 函数 | 规则字段 DSL（CSS/XPath/JsonPath + 内嵌JS） |
+| 适合     | 默认选择；强加密/多步拼装/复杂翻页尤其适合                | 需与原版 legado 生态互通                    |
+| 解析手段 | `org.jsoup.Jsoup.parse` / `JSON.parse` / 正则             | 规则选择器 + `java.getString` 等            |
+| 发现页   | 支持（`exploreUrl` 分类 + `explore` 函数成对）            | 支持                                        |
+| 契约参考 | [[references/js-source-format.md]]                        | [[references/fields.md]]                    |
 
 Phase 1-4（侦察/采集/分析/验证）与格式无关，照常执行；Phase 5/6 按格式分叉。
 
@@ -57,12 +59,12 @@ Phase 1-4（侦察/采集/分析/验证）与格式无关，照常执行；Phase
 
 优先 curl + 请求头，无效才上 Playwright。拿到正常 HTML 即停。
 
-| Level | 采集方式 | 触发特征 |
-|-------|----------|----------|
-| **L0** | curl（仅 UA） | 正常 HTML |
-| **L1** | curl + `Referer` | L0 遇 CF/403/空响应 |
-| **L2** | Playwright 后台无头 | L1 后仍见 `challenges.cloudflare.com`、`Just a moment` |
-| **L3** | Playwright 可见浏览器 | L2 后仍见 Turnstile、滑块 |
+| Level  | 采集方式              | 触发特征                                               |
+| ------ | --------------------- | ------------------------------------------------------ |
+| **L0** | curl（仅 UA）         | 正常 HTML                                              |
+| **L1** | curl + `Referer`      | L0 遇 CF/403/空响应                                    |
+| **L2** | Playwright 后台无头   | L1 后仍见 `challenges.cloudflare.com`、`Just a moment` |
+| **L3** | Playwright 可见浏览器 | L2 后仍见 Turnstile、滑块                              |
 
 记录每个端点生效的 Level（不同端点可能不同，如搜索 L1 + 正文 L0）。书源配置映射见 Phase 5。
 
@@ -74,17 +76,17 @@ Phase 1-4（侦察/采集/分析/验证）与格式无关，照常执行；Phase
 
 **目标：** 获取每个数据入口的 HTML/JSON 响应，保存供分析。
 
-默认用 Phase 1 的 Level（curl）执行，单步被拦才对该步升级。每种翻页至少验证 2 页。
+默认用 Phase 1 的 Level（curl）执行，单步被拦才对该步升级。存在分页时至少验证第 1、2 页；明确无分页时记录“无分页”，不强行制造第 2、3 页。
 
-| 步骤 | 操作 | 保存 |
-|------|------|------|
-| 搜索 | 输入关键词搜索 | tmp/search.html |
-| 搜索翻页 | 第2、3页 | tmp/search_p2.html, tmp/search_p3.html |
-| 详情 | 点击一本书 | tmp/detail.html |
-| 目录 | 进入目录页 | tmp/catalog.html |
-| 目录翻页 | 目录第2、3页 | tmp/catalog_p2.html, tmp/catalog_p3.html |
-| 正文 | 打开一个章节 | tmp/content.html |
-| 正文翻页 | 正文第2、3页 | tmp/content_p2.html, tmp/content_p3.html |
+| 步骤     | 操作           | 保存                                     |
+| -------- | -------------- | ---------------------------------------- |
+| 搜索     | 输入关键词搜索 | tmp/search.html                          |
+| 搜索翻页 | 第2、3页       | tmp/search_p2.html, tmp/search_p3.html   |
+| 详情     | 点击一本书     | tmp/detail.html                          |
+| 目录     | 进入目录页     | tmp/catalog.html                         |
+| 目录翻页 | 目录第2、3页   | tmp/catalog_p2.html, tmp/catalog_p3.html |
+| 正文     | 打开一个章节   | tmp/content.html                         |
+| 正文翻页 | 正文第2、3页   | tmp/content_p2.html, tmp/content_p3.html |
 
 每步保存后追加 `tmp/notes.md`：URL 模板、HTTP 方法、反爬级别、翻页参数规律、选择器线索、加密/签名/重定向备注。
 
@@ -98,16 +100,16 @@ Phase 1-4（侦察/采集/分析/验证）与格式无关，照常执行；Phase
 
 从 Phase 2 的 HTML 和 `tmp/notes.md` 分析，每个环节回答：输入是什么 → 怎么取（选择器/JS）→ 输出是什么。
 
-| 环节 | 输入 | 输出 | 分析来源 |
-|------|------|------|----------|
-| 搜索 | keyword | bookUrl 列表 | tmp/search.html |
-| 搜索翻页 | 第1页 | page 参数规律 | search.html → search_p2.html → search_p3.html |
-| 详情 | bookUrl | tocUrl + 元数据 | tmp/detail.html |
-| 目录 | tocUrl | chapterUrl 列表 | tmp/catalog.html |
-| 目录翻页 | 第1页 | nextTocUrl 规律 | catalog.html → catalog_p2.html → catalog_p3.html |
-| 正文 | chapterUrl | content 文本 | tmp/content.html |
-| 正文翻页 | 第1页 | nextContentUrl 规律 | content.html → content_p2.html → content_p3.html |
-| 发现 | 分类URL | bookUrl 列表 | tmp/home.html |
+| 环节     | 输入       | 输出                | 分析来源                                         |
+| -------- | ---------- | ------------------- | ------------------------------------------------ |
+| 搜索     | keyword    | bookUrl 列表        | tmp/search.html                                  |
+| 搜索翻页 | 第1页      | page 参数规律       | search.html → search_p2.html → search_p3.html    |
+| 详情     | bookUrl    | tocUrl + 元数据     | tmp/detail.html                                  |
+| 目录     | tocUrl     | chapterUrl 列表     | tmp/catalog.html                                 |
+| 目录翻页 | 第1页      | nextTocUrl 规律     | catalog.html → catalog_p2.html → catalog_p3.html |
+| 正文     | chapterUrl | content 文本        | tmp/content.html                                 |
+| 正文翻页 | 第1页      | nextContentUrl 规律 | content.html → content_p2.html → content_p3.html |
+| 发现     | 分类URL    | bookUrl 列表        | tmp/home.html                                    |
 
 验证选择器唯一性，分析 URL 加密/解密逻辑，确认翻页参数规律一致。
 
@@ -119,23 +121,26 @@ Phase 1-4（侦察/采集/分析/验证）与格式无关，照常执行；Phase
 
 **目标：** 用 Node.js 脚本验证分析结果，确保选择器和加密逻辑正确，再写书源。
 
-编写 `tmp/verify.js`，逐环节发请求验证。使用 fetch + cheerio（crypto-js 如需），每步间隔 2s 避免风控。Phase 3 的分析结果填入配置对象。
+编写 `tmp/verify.js`，逐环节发请求验证。默认只使用 Node 内置 `fetch`、`URL` 和断言；JSON/API 验证不得要求第三方包。只有需要离线执行 CSS 选择器时，才可选安装 `cheerio`，并在脚本开头明确标注该依赖。每步间隔 2s 避免风控。Phase 3 的分析结果填入配置对象。
 
-| 环节 | 验证点 |
-|------|--------|
-| 搜索 | URL 正确、选择器匹配、结果非空 |
-| 搜索翻页 | page 参数生效、翻页后结果不同 |
-| 详情 | 可访问、元数据/tocUrl 可提取 |
-| 目录 | 可访问、章节列表非空 |
-| 目录翻页 | nextTocUrl 规律一致、翻页后章节不同 |
-| 正文 | 可访问、正文非空无乱码 |
+可选依赖：`npm install --no-save cheerio`。Playwright 侦察使用现有浏览器工具，不作为 `verify.js` 的 Node 依赖。
+
+| 环节     | 验证点                                  |
+| -------- | --------------------------------------- |
+| 搜索     | URL 正确、选择器匹配、结果非空          |
+| 搜索翻页 | page 参数生效、翻页后结果不同           |
+| 详情     | 可访问、元数据/tocUrl 可提取            |
+| 目录     | 可访问、章节列表非空                    |
+| 目录翻页 | nextTocUrl 规律一致、翻页后章节不同     |
+| 正文     | 可访问、正文非空无乱码                  |
 | 正文翻页 | nextContentUrl 规律一致、翻页后内容不同 |
-| 替换净化 | 语法正确，替换无误伤 |
-| 加解密 | 函数输出与浏览器一致（如有） |
+| 替换净化 | 语法正确，替换无误伤                    |
+| 加解密   | 函数输出与浏览器一致（如有）            |
 
 ```bash
 node tmp/verify.js
 ```
+
 全部 PASS → Phase 5。有 FAIL → 回 Phase 3 修正。
 
 ---
@@ -149,6 +154,7 @@ node tmp/verify.js
 **纯JS单文件源（推荐）**：按 [[references/js-source-format.md]] 写 `.js`（source 配置 → search → getBookInfo → getChapters → getContent）。Phase 4 `tmp/verify.js` 验证过的解析逻辑逐行迁移进函数体（`fetch`→`java.ajax`、`cheerio`→`org.jsoup`，映射表见该参考文末）。
 
 **声明式 JSON 源**：从 [[references/fields.md]] 预填充字段，写源过程中查看 [[references/rule-syntax.md]] 和 [[references/js-api.md]]。按数据流顺序实现：
+
 1. 基础字段（bookSourceUrl, header, enabledCookieJar 等）
 2. 搜索（searchUrl + ruleSearch，含翻页）
 3. 详情（ruleBookInfo）
@@ -175,21 +181,22 @@ JS 源检查：整文件语法、Rhino 不兼容语法、`java.*` 是否在 JsEx
 
 全部通过 → 交付书源（JSON 或 `.js` 文件），清理 `tmp/`。有报错 → 修正后重跑。
 
+交付前检查：搜索和发现条目含绝对 `bookUrl`；章节含有效 `title`/`url`；正文非空且无挑战页/乱码；分页末页返回空并停止；图片源确认 Referer；纯 JS 的 `bookSourceType` 与结果对象 `type` 使用各自契约。
 
 ## 实现选择（按场景跳转）
 
-| 场景 | 怎么做 | 详细看 |
-|---|---|---|
-| 查字段名、规则对象结构、翻页字段 | — | [[references/fields.md]] |
-| HTML解析 | JSoup（默认模式） | [[references/rule-syntax.md]] §JSoup/CSS 选择器 |
-| JSON 解析 | `$.path[*]` JsonPath | [[references/rule-syntax.md]] §JsonPath |
-| JS 处理 | 选择器（可选）后追加 `@js:` | [[references/rule-syntax.md]] §规则中的 JavaScript |
-| 搜索需 POST 后 302 | `searchUrl` 使用JS处理 | [[references/js-api.md]] §重定向搜索 |
-| 列表项数据跨兄弟元素（如 `<dt>/<dd>`） | JS bookList 拼 NativeObject 数组，字段用 `$.xxx` 直读 | [[references/rule-syntax.md]] §bookList/chapterList 约束 |
-| API 返回 ID 拼 URL | bookList 用 JS 拼好完整 `bookUrl`，字段用 `$.bookUrl` | [[references/rule-syntax.md]] §JsonPath |
-| 阅读专属JS变量与函数 | — | [[references/js-api.md]] |
-| 拿到 CF 验证页、JS 挑战页、403、需手动登录 | — | [[references/anti-bot.md]] |
-| 用户反馈：搜索空 / 字段空 / 死循环 / 乱码 / 图片不显示 | — | [[references/debugging.md]] |
-| 找具体站点类型起手骨架（HTML网页、JSON API、登录、漫画） | — | [[references/site-templates.md]] |
-| 纯JS单文件源：config 键、四函数契约、运行环境、迁移映射 | — | [[references/js-source-format.md]] |
-| JS 源字符串操作报错/判空失灵（正则 `replace`、`split`、`length`、`===`） | Java 来源值先 `String(...)` 归一化 | [[references/js-source-format.md]] §运行环境 |
+| 场景                                                                     | 怎么做                                                | 详细看                                                   |
+| ------------------------------------------------------------------------ | ----------------------------------------------------- | -------------------------------------------------------- |
+| 查字段名、规则对象结构、翻页字段                                         | —                                                     | [[references/fields.md]]                                 |
+| HTML解析                                                                 | JSoup（默认模式）                                     | [[references/rule-syntax.md]] §JSoup/CSS 选择器          |
+| JSON 解析                                                                | `$.path[*]` JsonPath                                  | [[references/rule-syntax.md]] §JsonPath                  |
+| JS 处理                                                                  | 选择器（可选）后追加 `@js:`                           | [[references/rule-syntax.md]] §规则中的 JavaScript       |
+| 搜索需 POST 后 302                                                       | `searchUrl` 使用JS处理                                | [[references/js-api.md]] §重定向搜索                     |
+| 列表项数据跨兄弟元素（如 `<dt>/<dd>`）                                   | JS bookList 拼 NativeObject 数组，字段用 `$.xxx` 直读 | [[references/rule-syntax.md]] §bookList/chapterList 约束 |
+| API 返回 ID 拼 URL                                                       | bookList 用 JS 拼好完整 `bookUrl`，字段用 `$.bookUrl` | [[references/rule-syntax.md]] §JsonPath                  |
+| 阅读专属JS变量与函数                                                     | —                                                     | [[references/js-api.md]]                                 |
+| 拿到 CF 验证页、JS 挑战页、403、需手动登录                               | —                                                     | [[references/anti-bot.md]]                               |
+| 用户反馈：搜索空 / 字段空 / 死循环 / 乱码 / 图片不显示                   | —                                                     | [[references/debugging.md]]                              |
+| 找具体站点类型起手骨架（HTML网页、JSON API、登录、漫画）                 | —                                                     | [[references/site-templates.md]]                         |
+| 纯JS单文件源：config 键、四函数契约、运行环境、迁移映射                  | —                                                     | [[references/js-source-format.md]]                       |
+| JS 源字符串操作报错/判空失灵（正则 `replace`、`split`、`length`、`===`） | Java 来源值先 `String(...)` 归一化                    | [[references/js-source-format.md]] §运行环境             |

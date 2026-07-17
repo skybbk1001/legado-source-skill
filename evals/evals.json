@@ -30,6 +30,24 @@
       "prompt": "我的纯JS单文件书源目录页报错：com.script.ScriptException: org.htmlunit.corejs.javascript.EvaluatorException: 对应于 JavaScript 参数类型 (object,string) 的 Java 方法 java.lang.String.replace 的选择不明确。建议的方法是: class java.lang.String replace(java.lang.CharSequence,java.lang.CharSequence) / class java.lang.String replace(char,char)。报错那行是 url = book.bookUrl.replace(/\\/+$/, \"\") + \"/\" + href，帮我修一下",
       "expected_output": "指出 book.bookUrl 是经成员访问取得的 Java 包装字符串，正则 replace 走 Java 重载分派因而歧义；修复为 String(book.bookUrl).replace(/\\/+$/, \"\")，并说明字符串两型边界（js-source-format.md §运行环境，锚 JsTest.javaStringInteropBoundary）",
       "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "我用的是阅读T fork，想给一个没有分页的 JSON API 写书源。接口返回搜索、目录和正文 JSON，但没有第 2 页。请先按阅读T纯 JS 单文件源分析并给出实现，不要强行生成原版 Legado JSON 源，也不要要求安装 cheerio。",
+      "expected_output": "明确阅读T专用边界；默认输出 source + search/getChapters/getContent 的 .js；验证脚本使用 Node 内置能力；无分页时记录并验证单页，不伪造分页；返回值、绝对 bookUrl、章节 title/url 契约正确",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "下面的阅读T纯JS书源在 App 里运行。请判断校验器应该如何处理：function search(key, page) { return data?.list ?? []; }。",
+      "expected_output": "根据阅读T当前 Rhino 实测兼容面，指出可选链 ?. 和空值合并 ?? 是支持语法；validate-jssource.js 不应因这两项报错，后续只检查变量和返回值契约",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "我只有 Node.js，没有安装任何 npm 包。需要验证一个书源的 JSON API 搜索和正文是否非空。应该怎么组织 tmp/verify.js 的依赖？",
+      "expected_output": "默认使用 Node 内置 fetch、URL 和断言完成 API 验证；不要求 cheerio；只有离线 CSS 选择器验证时才把 cheerio 作为可选依赖并明确安装命令",
+      "files": []
     }
   ]
 }

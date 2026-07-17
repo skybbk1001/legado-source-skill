@@ -42,7 +42,7 @@
 | `Origin` | CORS 检查 |
 | `Accept` | 内容协商 |
 
-## 3. CloudFlare 三层绕过
+## 3. CloudFlare 会话获取
 
 > 上下文：代码用于 `loginCheckJs`，`java` 是 `AnalyzeUrl` 实例
 
@@ -55,7 +55,7 @@
   if (cfRe.test(res.body())) {
     const cfProbe = `
       (() => {
-        window.__legadoCfStart ??= Date.now();
+        if (!window.__legadoCfStart) window.__legadoCfStart = Date.now();
         const maxWait = 6000;
         const blocked = window._cf_chl_opt ||
           document.querySelector('script[src*="challenge-platform"],script[src*="challenges.cloudflare.com"]');
@@ -86,7 +86,7 @@
 
 - 搜索用 `startBrowser`（非阻塞），详情/目录/正文用 `startBrowserAwait`
 - 追踪拦截次数，限 2 次转手动
-- WebView 在新版 CF 上可能失败（WebGL/字体检测）
+- WebView 在新版 CF 上可能失败（WebGL/字体检测）；此时只能让用户在浏览器中完成验证，不能承诺自动绕过。
 
 ## 4. JS 挑战页
 

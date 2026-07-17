@@ -1,7 +1,7 @@
 // Rhino 不兼容语法检查(两个校验器共用)。
 // 边界锚定 app/src/test/.../JsTest.kt:不支持面 #es6CompatBoundary,支持面 #es6SupportedFeatures。
-// `...` 按括号上下文分类:字面量展开 [.../{... 与函数剩余参数 f(...args){ 支持,
-// 调用处展开 f(...arr) 与数组剩余解构 [a,...b]= 不支持——正则区分不了参数位/调用位,须结构分类。
+// `...` 按括号上下文分类:字面量展开 [.../{...、函数剩余参数 f(...args){ 与剩余解构支持,
+// 调用处展开 f(...arr) 不支持——正则区分不了参数位/调用位,须结构分类。
 const REGEX_CHECKS = [
   { pattern: /\basync\s+(function|\(|\w+\s*\()/, msg: 'async/await — Rhino不支持,java.ajax 等本就是同步' },
   { pattern: /\bawait\s+/, msg: 'await — Rhino不支持' },
@@ -72,14 +72,8 @@ function spreadIssues(clean) {
       if (!isParamList) {
         issues.push({ line: lineOf(clean, i), msg: '函数调用展开 f(...arr) — Rhino不支持,用 fn.apply(null, arr)' });
       }
-    } else if (open && open.ch === '[') {
-      const close = matchClose(clean, open.pos);
-      const after = close >= 0 ? nextNonSpace(clean, close + 1) : -1;
-      if (after >= 0 && clean[after] === '=' && clean[after + 1] !== '=') {
-        issues.push({ line: lineOf(clean, i), msg: '数组剩余解构 [a, ...b] — Rhino不支持,用 arr.slice(1)' });
-      }
     }
-    // 对象展开 {...o} 与数组字面量展开 [...a]、剩余参数 f(...args) 均支持
+    // 对象/数组字面量展开 {...o}/[...a]、剩余参数 f(...args)、剩余解构 [a,...b]/{a,...r} 均支持
     i += 2;
   }
   return issues;

@@ -105,7 +105,7 @@ XHR 返回 JSON，反爬弱。
     "coverUrl": "$.data.cover",
     "kind": "$.data.category",
     "lastChapter": "$.data.latest_chapter",
-    "tocUrl": "@js:'https://api.example.com/v1/book/' + book.bookUrl.split('/').pop() + '/chapters'"
+    "tocUrl": "@js:'https://api.example.com/v1/book/' + String(book.bookUrl).split('/').pop() + '/chapters'"
   },
 
   "ruleToc": {

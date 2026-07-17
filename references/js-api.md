@@ -14,16 +14,17 @@ function getBook(url) {
 
 ## ES6+ 兼容性
 
-Rhino 支持大部分 ES6+（下表 2026-07-04 经引擎探针实测；不支持项锚定 `app/src/test/.../JsTest.kt#es6CompatBoundary`，支持项 2026-07-16 起锚定同文件 `#es6SupportedFeatures`）：
+Rhino 支持大部分 ES6+（下表基于引擎探针实测，引擎 htmlunit-core-js 5.3.0-legado.2 定界；不支持项锚定 `app/src/test/.../JsTest.kt#es6CompatBoundary`，支持项（含 `??=`/`&&=`/`||=`）锚定同文件 `#es6SupportedFeatures`）：
 
 | ✅ 完全支持 | ❌ 不支持 | 替代方案 |
 |---|---|---|
 | `let` / `const` | `class` | function + prototype |
 | 箭头函数 `=>` | `async` / `await` | 同步写法（引擎无事件循环） |
-| 模板字符串 `` ` `` | 数组剩余解构 `[a, ...b]` | `b = arr.slice(1)` |
-| 解构 `{a, b}` / `[a, b]` | 函数调用展开 `fn(...arr)` | `fn.apply(null, arr)` |
-| 默认参数 `(x = 1)` | `Promise` 链（then 回调不执行） | 同步写法；网络请求本就是同步的 |
+| 模板字符串 `` ` `` | 函数调用展开 `fn(...arr)` | `fn.apply(null, arr)` |
+| 解构 `{a, b}` / `[a, b]` | `Promise` 链（then 回调不执行） | 同步写法；网络请求本就是同步的 |
+| 默认参数 `(x = 1)` | | |
 | 剩余参数 `function(...args)` | | |
+| 剩余解构 `[a, ...b]` / `{a, ...r}` | | |
 | 展开 `[...a]` / `{...o}` | | |
 | `for...of` | | |
 | `?.` 可选链 | | |

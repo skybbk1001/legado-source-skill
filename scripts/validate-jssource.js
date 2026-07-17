@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 纯JS单文件书源校验: node scripts/validate-jssource.js <source.js>
 // 检查: 整文件语法 / Rhino 不兼容语法 / java.* 是否在 JsExtensions 面内 /
-//       source 必填键与类型 / 必备函数存在 / 剥除键与用户态键提示
+//       Java 包装字符串误用 / source 必填键与类型 / 必备函数存在 / 剥除键与用户态键提示
 const fs = require('fs');
 const vm = require('vm');
 const { stripAll, rhinoIssues } = require('./rhino-checks.js');
@@ -92,7 +92,33 @@ function main() {
     }
   }
 
-  // 4. 执行顶层声明,提取 source 与函数(空沙箱:顶层出现运行时调用会在此暴露)
+  // 4. Java 包装字符串上的 JS 专属操作(锚 JsTest.javaStringInteropBoundary):
+  //    成员访问取得的字符串是包装对象,同名 Java 方法优先分派;String(...) 归一化后即原生字符串。
+  //    识别面收窄到受者确定是 Java 来源的三类(实体属性/java.* 返回/Jsoup 取值);
+  //    正则字面量是识别特征,用保留正则的剥离文本(stripAll 连正则一并抹掉)。
+  const blank = (m) => m.replace(/[^\n]/g, ' ');
+  const keepRe = text
+    .replace(/`[^`\\]*(?:\\.[^`\\]*)*`/g, blank)
+    .replace(/"[^"\n\\]*(?:\\.[^"\n\\]*)*"/g, blank)
+    .replace(/'[^'\n\\]*(?:\\.[^'\n\\]*)*'/g, blank)
+    .replace(/\/\*[\s\S]*?\*\//g, blank)
+    .replace(/\/\/[^\n]*/g, blank);
+  const lineAt = (pos) => keepRe.slice(0, pos).split('\n').length;
+  const JAVA_RECV = '(?:\\b(?:book|chapter|source)\\.\\w+|\\bjava\\.\\w+\\([^()\\n]*\\)|\\.(?:text|attr|html|outerHtml|val|absUrl)\\([^()\\n]*\\))';
+  [
+    ['\\s*\\.\\s*replace\\s*\\(\\s*/', errors, '正则 replace 经 Java 重载分派歧义报错'],
+    ['\\s*\\.\\s*split\\s*\\(', warnings, 'split 走 Java 语义(参数按 Java 正则解释、丢尾部空串)'],
+    ['\\s*\\.\\s*length\\b', warnings, 'length 是 Java 方法非属性'],
+  ].forEach(([tail, list, why]) => {
+    const re = new RegExp(JAVA_RECV + tail, 'g');
+    let m;
+    while ((m = re.exec(keepRe)) !== null) {
+      list.push(`line ${lineAt(m.index)}: ${m[0].replace(/\s+/g, ' ').trim()} — ` +
+        `${why},受者先 String(...) 归一化(锚 JsTest.javaStringInteropBoundary)`);
+    }
+  });
+
+  // 5. 执行顶层声明,提取 source 与函数(空沙箱:顶层出现运行时调用会在此暴露)
   let probe;
   try {
     const context = vm.createContext({});

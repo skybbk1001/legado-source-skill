@@ -24,6 +24,12 @@
       "prompt": "https://read.nqg8.com 的正文接口每次请求要带 sign 参数，sign 是 md5(章节id+时间戳+盐)，盐要先请求 /api/init 拿。这种多步拼装用规则不好写，帮我做成纯JS单文件书源。搜索接口 /api/search?q=词 返回 {list:[{id,name,author}]}，目录 /api/book/{id}/chapters 返回 {chapters:[{id,title}]}",
       "expected_output": "完整的 .js 单文件书源：顶层 source 配置（bookSourceUrl/bookSourceName 必填）+ search/getChapters/getContent 函数；JSON.parse 解析接口返回，java.md5Encode 拼 sign，盐经 cache 或函数内请求获取；search 每项含绝对 bookUrl；通过 validate-jssource.js 校验",
       "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "我的纯JS单文件书源目录页报错：com.script.ScriptException: org.htmlunit.corejs.javascript.EvaluatorException: 对应于 JavaScript 参数类型 (object,string) 的 Java 方法 java.lang.String.replace 的选择不明确。建议的方法是: class java.lang.String replace(java.lang.CharSequence,java.lang.CharSequence) / class java.lang.String replace(char,char)。报错那行是 url = book.bookUrl.replace(/\\/+$/, \"\") + \"/\" + href，帮我修一下",
+      "expected_output": "指出 book.bookUrl 是经成员访问取得的 Java 包装字符串，正则 replace 走 Java 重载分派因而歧义；修复为 String(book.bookUrl).replace(/\\/+$/, \"\")，并说明字符串两型边界（js-source-format.md §运行环境，锚 JsTest.javaStringInteropBoundary）",
+      "files": []
     }
   ]
 }

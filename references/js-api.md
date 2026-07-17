@@ -1,7 +1,7 @@
 # JavaScript API 参考
 
 Legado 内嵌 Rhino JS 引擎（htmlunit-core-js），无浏览器 DOM/Window/fetch 等 API，但内置Crypto-js支持。
-字符串判空用 `String()` 包裹：java 返回的空字符串在 js 里转布尔值为 true。
+字符串两型（2026-07-17 探针锚定 `JsTest.javaStringInteropBoundary`）：`result`/`key` 等裸绑定值是 JS 原生字符串；经成员访问取得的（`book`/`chapter`/`source` 属性、`java.*` 返回值、Jsoup 元素方法）是 Java 包装对象——空串为真值、`typeof` 为 object、`===` 与同文本 JS 字符串不等、正则 `replace` 重载歧义报错、`split` 走 Java 语义。用 JS 字符串方法与判空前先 `String(...)` 归一化。
 
 **jsLib 上下文**：无 java/cache/cookie 等全局变量，函数需要从 this 解构：
 ```js

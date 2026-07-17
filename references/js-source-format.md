@@ -78,6 +78,14 @@ function getContent(chapter, book) { /* 返回正文字符串 */ }
   }
   ```
   JSON API 用 `JSON.parse(java.ajax(url))`。
+- **字符串两型**（2026-07-17 探针锚定 `JsTest.javaStringInteropBoundary`）：`key`/`baseUrl` 等
+  裸绑定参数是 JS 原生字符串；经成员访问取得的字符串（`book.bookUrl`/`chapter.url`、
+  Jsoup `.text()`/`.attr()`、`java.ajax()` 等返回值）是 Java 包装对象——`typeof` 为 object、
+  `.length` 是方法、空串为真值、与同文本 JS 字符串 `===` 不等；同名 Java 方法优先分派
+  （正则 `replace` 重载歧义报错、`split` 走 Java 语义），未被遮蔽的名字（`match` 等）回落
+  String.prototype。用 JS 字符串能力与判空前先 `String(...)` 归一化：
+  `String(book.bookUrl).replace(/\/+$/, "")`；拼接、模板字符串、传 Java 方法参数、
+  作返回对象字段值（`JSON.stringify` 自动解包）直接用。
 - 绑定 `source`/`cookie`/`cache`/`baseUrl` 可直接使用；函数参数同时是同名绑定。
   `jsLib` 内函数取不到调用方绑定，依赖经参数传入或 `this` 解构（同 [[js-api.md]] jsLib 契约）。
 - 每次调用在新 scope 执行主脚本，顶层变量不跨调用保留；跨请求状态存
@@ -94,6 +102,7 @@ verify.js（node）验证过的逻辑逐行迁移：
 | `cheerio.load(html)` / `$('a').text()` | `org.jsoup.Jsoup.parse(html)` / `.select('a').text()` |
 | `crypto-js` | `CryptoJS.*` 或 `java.createSymmetricCrypto` 族 |
 | `new URL(rel, base)` | 章节相对 url 交给应用补全；其余 `java.toURL(rel, base)` |
+| 字符串链式操作 `str.replace(/re/, ...)` 等 | Java 来源值（`book.*`、Jsoup、`java.ajax()` 返回）先 `String(...)` 再链 |
 
 ## 校验
 

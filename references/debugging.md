@@ -100,6 +100,15 @@ java.logType(variable);
 | 图片不显示 | Referer 检查 | URL 拼 `,{"headers":{"Referer":"..."}}` |
 | 图片需解密 | 加密 CDN | `imageDecode` 写解密 JS |
 
+### 纯JS单文件源
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| 报错"Java 方法 java.lang.String.replace 的选择不明确/ambiguous" | 对 Java 来源字符串（`book.*`/`chapter.*` 属性、Jsoup 取值、`java.ajax()` 返回）调了正则 `replace`，走 Java 重载分派 | 受者先 `String(...)` 归一化；机制见 [[js-source-format.md]] §运行环境 |
+| `split`/`.length`/`===`/判空结果不合预期 | 同上：Java 包装字符串语义 | 同上 |
+| 调试四阶段全"完成"但无字段/内容细节 | JS 源不走声明式解析器，调试只有阶段行+搜索计数 | 属正常；要看中间值在函数里 `java.log(...)` 打点 |
+| 调试正常但真实搜索无结果 | 源不在搜索范围（分组未含）/被精准搜索过滤/未启用 | 让用户检查搜索范围、精准搜索开关、源启用态 |
+
 ### 反爬
 
 | 现象 | 处理 |

@@ -192,3 +192,4 @@ JS 源检查：整文件语法、Rhino 不兼容语法、`java.*` 是否在 JsEx
 | 用户反馈：搜索空 / 字段空 / 死循环 / 乱码 / 图片不显示 | — | [[references/debugging.md]] |
 | 找具体站点类型起手骨架（HTML网页、JSON API、登录、漫画） | — | [[references/site-templates.md]] |
 | 纯JS单文件源：config 键、四函数契约、运行环境、迁移映射 | — | [[references/js-source-format.md]] |
+| JS 源字符串操作报错/判空失灵（正则 `replace`、`split`、`length`、`===`） | Java 来源值先 `String(...)` 归一化 | [[references/js-source-format.md]] §运行环境 |

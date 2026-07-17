@@ -178,7 +178,8 @@ java.toURL(urlStr);                  // 解析 URL → { url, host, path, queryM
 java.toURL(url, baseUrl);            // 解析相对 URL
 java.t2s(text);                      // 繁体 → 简体
 java.s2t(text);                      // 简体 → 繁体
-java.htmlFormat(str);                // 清理 HTML
+java.htmlFormat(str);                // HTML→段落文本,保留 <img>(formatKeepImg)
+java.htmlFormat(str, redirectUrl);   // 同上,并按 redirectUrl 补全相对图片地址(声明式正文管道同款)
 java.strToBytes(str);                // String → ByteArray
 java.bytesToStr(bytes);              // ByteArray → String
 ```

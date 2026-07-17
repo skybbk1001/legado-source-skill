@@ -37,15 +37,15 @@ function getContent(chapter, book) { /* 返回正文字符串 */ }
 - `exploreUrl`（发现分类）与 `explore` 函数成对：声明分类即须实现函数（导入时校验）；
   都不写则无发现入口，校验时发现检查自动跳过。分类语法同声明式（文本行 `名称::url`，
   换行或 `&&` 分隔；分区头/网格样式用 JSON 数组形态，见 [[fields.md]] §发现），但分类的
-  `url` **原样传入** `explore(url, page)`——不经 AnalyzeUrl，`{{page}}`/`<1,2,3>`/URL 选项
-  在此无效，翻页用 `page` 参数自行拼接。
+  `url` **原样传入** `explore(url, page)`，翻页由 `page` 参数表达（`{{page}}`/`<1,2,3>`/
+  URL 选项是 AnalyzeUrl 管道语法，仅声明式源生效）。
 
 ## 函数契约
 
 | 函数 | 入参 | 返回 |
 |---|---|---|
 | `search(key, page)` | 搜索词；页码从 1 起 | `SearchBook[]` |
-| `explore(url, page)` | 分类地址（`exploreUrl` 条目的 url 段，原样传入不做模板处理）；页码从 1 起 | `SearchBook[]`，契约同 search |
+| `explore(url, page)` | 分类地址（`exploreUrl` 条目的 url 段，原样传入）；页码从 1 起 | `SearchBook[]`，契约同 search |
 | `getBookInfo(book)` | 书籍对象（已含 search 阶段字段） | 覆盖字段对象 |
 | `getChapters(book)` | 书籍对象 | `Chapter[]`，数组序即目录序 |
 | `getContent(chapter, book)` | 章节、书籍对象；另有绑定 `nextChapterUrl`（可能 null） | 正文字符串，空即失败 |
@@ -63,6 +63,10 @@ function getContent(chapter, book) { /* 返回正文字符串 */ }
 **Chapter**：`title`、`url` 必填，缺失的条目被丢弃；相对 `url` 按 `book.tocUrl` 补全。
 分卷行：`isVolume: true` 且 `url` 与 `title` 相同，不抓正文。可选 `isVip`/`isPay`/
 `wordCount`/`tag`/`resourceUrl`（音频真实地址）。`index` 由应用按数组序注入。
+
+**getContent 返回值即最终正文**，阅读器按纯文本排版、正文内 `<img src>` 渲染为插图：
+拼纯文本（段落 `\n` 分隔），或取正文节点 HTML 用 `java.htmlFormat(html, chapter.url)`
+转段落文本（声明式正文管道同款，保留 `<img>` 并补全相对地址）。
 
 **type 位值**（`search`/`getBookInfo` 均可覆写）：文本 8、音频 32、图片 64、下载 128；
 与 `bookSourceType` 的 0-3 是两套取值。

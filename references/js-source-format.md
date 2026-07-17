@@ -15,7 +15,7 @@ const source = {
   bookSourceUrl: "https://example.com", // 必填,主键;修改即成为新源
   bookSourceName: "示例JS源",           // 必填
   bookSourceType: 0,                    // 0文本 1音频 2图片 3下载站
-  lastUpdateTime: 0                     // 版本时间戳,重复导入按此判断新旧
+  lastUpdateTime: 0                     // 版本时间戳,写死毫秒数值,发新版时调大;同 URL 重复导入大于库内值才提示"更新"
 }
 
 function search(key, page) { /* 返回 SearchBook[] */ }

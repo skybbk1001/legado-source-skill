@@ -15,6 +15,9 @@ const source = {
   bookSourceUrl: "https://example.com", // 必填,主键;修改即成为新源
   bookSourceName: "示例JS源",           // 必填
   bookSourceType: 0,                    // 0文本 1音频 2图片 3下载站
+  exploreUrl: [                         // 发现分类(可选,数组首选);与 explore 函数成对
+    { title: "玄幻", url: "https://example.com/sort/1.html" },
+  ],
   lastUpdateTime: 0                     // 版本时间戳,写死毫秒数值,发新版时调大;同 URL 重复导入大于库内值才提示"更新"
 }
 
@@ -35,9 +38,12 @@ function getContent(chapter, book) { /* 返回正文字符串 */ }
 - `enabled`/`customOrder` 等用户态字段由应用维护，脚本值不生效。
 - `mainJs` 与六个 `rule*` 字段在提取时剥除。
 - `exploreUrl`（发现分类）与 `explore` 函数成对：声明分类即须实现函数（导入时校验）；
-  都不写则无发现入口，校验时发现检查自动跳过。分类语法同声明式（文本行 `名称::url`，
-  换行或 `&&` 分隔；分区头/网格样式用 JSON 数组形态，见 [[fields.md]] §发现），但分类的
-  `url` **原样传入** `explore(url, page)`，翻页由 `page` 参数表达（`{{page}}`/`<1,2,3>`/
+  都不写则无发现入口，校验时发现检查自动跳过。**首选数组形态**——每项
+  `{title, url}`，省略 `url` 的项渲染为分区标题，可带 `style` 网格样式（同声明式，
+  见 [[fields.md]] §发现）；每项须有非空 `title`（导入时校验），空数组等价于未声明。
+  提取时数组序列化为 JSON 字符串落库，消费侧与声明式同构。也接受字符串形态
+  （文本行 `名称::url`，换行或 `&&` 分隔，或 JSON 数组文本）。分类的 `url`
+  **原样传入** `explore(url, page)`，翻页由 `page` 参数表达（`{{page}}`/`<1,2,3>`/
   URL 选项是 AnalyzeUrl 管道语法，仅声明式源生效）。
 
 ## 函数契约
@@ -60,7 +66,7 @@ function getContent(chapter, book) { /* 返回正文字符串 */ }
 `latestChapterTitle`/`tocUrl`/`type`/`variable`，只有写出的键才覆盖，其余键忽略。
 `tocUrl` 缺省用 `book.bookUrl`；`variable` 值须是 JSON 字符串（`'{"k":"v"}'`）。
 
-**Chapter**：`title`、`url` 必填，缺失的条目被丢弃；相对 `url` 按 `book.tocUrl` 补全。
+**Chapter**：`title`、`url` 必填，缺失的条目被丢弃；相对 `url` 按 `book.tocUrl` 补全。`getContent` 的第三个参数 `nextChapterUrl` 由应用传入，纯 JS 源自行决定是否使用。
 分卷行：`isVolume: true` 且 `url` 与 `title` 相同，不抓正文。可选 `isVip`/`isPay`/
 `wordCount`/`tag`/`resourceUrl`（音频真实地址）。`index` 由应用按数组序注入。
 

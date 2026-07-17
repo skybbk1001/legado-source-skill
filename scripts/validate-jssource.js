@@ -155,9 +155,20 @@ function main() {
       if (t !== 'function') errors.push(`缺少必备函数 ${name}`);
     });
     if (gbi !== 'function') console.log('(getBookInfo 未定义 — 可选,详情沿用 search 阶段字段)');
-    if (probe.config && typeof probe.config.exploreUrl === 'string' &&
-        probe.config.exploreUrl && exp !== 'function') {
-      errors.push('声明了 exploreUrl 须配对实现 explore(url, page) — 契约同 search');
+    if (probe.config) {
+      const eu = probe.config.exploreUrl;
+      // 提取侧语义:数组=分类项列表(空数组视同未声明),字符串=名称::url 行文/JSON 文本
+      const declared = Array.isArray(eu) ? eu.length > 0 : (typeof eu === 'string' && eu !== '');
+      if (Array.isArray(eu)) {
+        eu.forEach((item, i) => {
+          if (!item || typeof item !== 'object' || typeof item.title !== 'string' || !item.title.trim()) {
+            errors.push(`exploreUrl 第 ${i + 1} 项缺少非空 title — 导入时报错`);
+          }
+        });
+      }
+      if (declared && exp !== 'function') {
+        errors.push('声明了 exploreUrl 须配对实现 explore(url, page) — 契约同 search');
+      }
     }
   }
 

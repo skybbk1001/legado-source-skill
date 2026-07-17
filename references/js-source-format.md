@@ -1,7 +1,8 @@
 # 纯JS单文件书源（仅本 fork）
 
 一个 `.js` 文件即一个完整书源：顶层为一个 `source` 配置对象与若干 `function` 声明，声明即生效。
-`search` / `getChapters` / `getContent` 必备（缺失在导入/保存时报错），`getBookInfo` 可选。
+`search` / `getChapters` / `getContent` 必备（缺失在导入/保存时报错），`getBookInfo` 可选，
+`explore` 与 `source.exploreUrl` 成对（声明分类未实现函数在导入时报错）。
 交付物是 `.js` 文件，用户在源管理页"新建JS源"粘贴，或直接导入 `.js` 文件/直链。
 
 引擎侧事实源：`JsSourceConfig`（提取校验）、`JsSourceEngine`（调用）、`JsSourceMarshaller`（返回值落库）。
@@ -18,6 +19,7 @@ const source = {
 }
 
 function search(key, page) { /* 返回 SearchBook[] */ }
+function explore(url, page) { /* 可选,与 source.exploreUrl 成对,返回 SearchBook[] */ }
 function getBookInfo(book) { /* 可选,返回覆盖字段对象 */ }
 function getChapters(book) { /* 返回 Chapter[] */ }
 function getContent(chapter, book) { /* 返回正文字符串 */ }
@@ -32,13 +34,15 @@ function getContent(chapter, book) { /* 返回正文字符串 */ }
 
 - `enabled`/`customOrder` 等用户态字段由应用维护，脚本值不生效。
 - `mainJs` 与六个 `rule*` 字段在提取时剥除。
-- JS 源无发现页；校验书源时发现检查自动跳过。
+- `exploreUrl`（发现分类，`名称::url` 每行一个，语法同声明式）与 `explore` 函数成对：
+  声明分类即须实现函数（导入时校验）；都不写则无发现入口，校验时发现检查自动跳过。
 
-## 四函数契约
+## 函数契约
 
 | 函数 | 入参 | 返回 |
 |---|---|---|
 | `search(key, page)` | 搜索词；页码从 1 起 | `SearchBook[]` |
+| `explore(url, page)` | 分类地址（`exploreUrl` 中 `名称::url` 的 url 段）；页码从 1 起 | `SearchBook[]`，契约同 search |
 | `getBookInfo(book)` | 书籍对象（已含 search 阶段字段） | 覆盖字段对象 |
 | `getChapters(book)` | 书籍对象 | `Chapter[]`，数组序即目录序 |
 | `getContent(chapter, book)` | 章节、书籍对象；另有绑定 `nextChapterUrl`（可能 null） | 正文字符串，空即失败 |
@@ -46,7 +50,7 @@ function getContent(chapter, book) { /* 返回正文字符串 */ }
 返回数组/对象或 `JSON.stringify` 字符串均可（引擎收字符串直接解析，收对象自动转 JSON）。
 
 **SearchBook**：`name`、`bookUrl` 必填，缺失的条目被丢弃；`bookUrl`/`tocUrl` 需绝对地址
-（search 结果不做相对补全）。可选 `author`/`kind`（逗号分隔）/`coverUrl`/`intro`/
+（search/explore 结果不做相对补全）。可选 `author`/`kind`（逗号分隔）/`coverUrl`/`intro`/
 `wordCount`（字符串）/`latestChapterTitle`/`tocUrl`/`type`。`origin` 系字段由应用注入。
 
 **getBookInfo 覆盖白名单**：`name`/`author`/`intro`/`coverUrl`/`kind`/`wordCount`/

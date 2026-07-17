@@ -50,14 +50,14 @@ const VALID_CONFIG_KEYS = new Set([
   'bookSourceUrl','bookSourceName','bookSourceType','bookSourceComment','bookSourceGroup',
   'bookUrlPattern','enabledCookieJar','header','concurrentRate','jsLib',
   'loginUrl','loginUi','loginCheckJs','coverDecodeJs','eventListener','customButton',
-  'variableComment','lastUpdateTime',
+  'variableComment','lastUpdateTime','exploreUrl',
 ]);
 const STRIPPED_KEYS = new Set([
   'mainJs','ruleSearch','ruleExplore','ruleBookInfo','ruleToc','ruleContent','ruleReview',
 ]);
 const INERT_KEYS = new Set([
   'enabled','enabledExplore','customOrder','weight','respondTime', // 用户态,应用维护
-  'searchUrl','exploreUrl','exploreScreen',                        // 声明式管道,JS 源不走
+  'searchUrl','exploreScreen',                                     // 声明式管道,JS 源不走
 ]);
 
 function main() {
@@ -124,7 +124,7 @@ function main() {
     const context = vm.createContext({});
     probe = vm.runInContext(
       text + '\n;({ sourceType: typeof source,' +
-        ' fns: [typeof search, typeof getBookInfo, typeof getChapters, typeof getContent],' +
+        ' fns: [typeof search, typeof getBookInfo, typeof getChapters, typeof getContent, typeof explore],' +
         ' config: typeof source === "object" ? source : null })',
       context, { timeout: 3000 });
   } catch (e) {
@@ -150,11 +150,15 @@ function main() {
         else if (!VALID_CONFIG_KEYS.has(k)) warnings.push(`source 未知键: ${k}`);
       }
     }
-    const [s, gbi, gc, gct] = probe.fns;
+    const [s, gbi, gc, gct, exp] = probe.fns;
     [['search', s], ['getChapters', gc], ['getContent', gct]].forEach(([name, t]) => {
       if (t !== 'function') errors.push(`缺少必备函数 ${name}`);
     });
     if (gbi !== 'function') console.log('(getBookInfo 未定义 — 可选,详情沿用 search 阶段字段)');
+    if (probe.config && typeof probe.config.exploreUrl === 'string' &&
+        probe.config.exploreUrl && exp !== 'function') {
+      errors.push('声明了 exploreUrl 须配对实现 explore(url, page) — 契约同 search');
+    }
   }
 
   if (errors.length) {

@@ -26,15 +26,15 @@ AI：使用curl、Playwright MCP（DOM、Network XHR）、Nodejs、读文件等�
 
 新建源时先让用户在两种格式中选择，再开始侦察；用户已指明格式则跳过，调试既有源沿用其格式。
 **推荐并默认纯JS单文件源**：命令式 JS 比规则 DSL 出错面小（无规则链/切片/对位等隐性语义），
-Phase 4 验证逻辑可直迁函数体，校验器可实际执行脚本。用户需要与原版 legado 生态互通、
-或需要发现页时选声明式 JSON 源。
+Phase 4 验证逻辑可直迁函数体，校验器可实际执行脚本。用户需要与原版 legado 生态互通时
+选声明式 JSON 源。
 
 | | 纯JS单文件源（推荐，仅本 fork） | 声明式 JSON 源 |
 |---|---|---|
 | 形态 | 一个 `.js` 文件，`search`/`getChapters`/`getContent` 函数 | 规则字段 DSL（CSS/XPath/JsonPath + 内嵌JS） |
-| 适合 | 默认选择；强加密/多步拼装/复杂翻页尤其适合 | 需与原版 legado 生态互通；需要发现页 |
+| 适合 | 默认选择；强加密/多步拼装/复杂翻页尤其适合 | 需与原版 legado 生态互通 |
 | 解析手段 | `org.jsoup.Jsoup.parse` / `JSON.parse` / 正则 | 规则选择器 + `java.getString` 等 |
-| 发现页 | 无 | 支持 |
+| 发现页 | 支持（`exploreUrl` 分类 + `explore` 函数成对） | 支持 |
 | 契约参考 | [[references/js-source-format.md]] | [[references/fields.md]] |
 
 Phase 1-4（侦察/采集/分析/验证）与格式无关，照常执行；Phase 5/6 按格式分叉。

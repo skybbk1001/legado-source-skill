@@ -187,15 +187,15 @@ JS 源检查：整文件语法、Rhino 不兼容语法、`java.*` 是否在 JsEx
 
 ### Phase 7: App 内闭环实测（legado MCP 可用时）
 
-**目标：** 在真实 App 环境跑通全管线，交付已验证的源。
+工具名形如 `mcp__legado__save_source`，以此类推（下文用短名）。
 
-`save_source` 推送（返回 bookSourceUrl）→ `debug_source` 调试 → 失败时 `get_http_logs` / `get_http_log` 看 App 实发请求 → 改源重推 → 复测。
+**流程：** `save_source` 推送（返回 bookSourceUrl）→ `debug_source` 调试 → 日志看不出原因时 `set_http_log_recording(true)` 开日志再跑一次 → `get_http_logs` / `get_http_log` 看 App 实发请求头（CookieStore/UA/重定向）→ 改源重推 → 复测 → 收尾 `set_http_log_recording(false)`。
 
 `debug_source` 的 key 决定入口：普通关键词=搜索→详情→目录→正文全管线；绝对URL=详情起步；`::URL`=发现页；`++URL`=仅目录；`--URL`=仅正文。改动只涉及单步时用前缀分步复测，省整链耗时。
 
-`get_http_log` 的价值是 App 实发请求头（CookieStore/UA/重定向）与 Phase 2 采集时的差异对比；正文在 App 记录时截断至 4096 字符，完整响应体以 `tmp/` 存档为准。HTTP 日志需开启「记录HTTP日志」：`set_http_log_recording(true)` 远程开启，验收收尾时关闭。
+`get_http_log` 正文记录时截断至 4096 字符，完整响应体以 `tmp/` 存档为准。
 
-**验证门：** 搜索/详情/目录/正文（+发现，如有）日志全绿 → 交付源文件，清理 `tmp/`。测试源已在 App 内即成品。
+**验证门：** 搜索/详情/目录/正文（+发现，如有）日志全绿 → `list_sources` 确认源在 App 内 → 交付源文件，清理 `tmp/`（测试源已是成品，无需删除；删除用 `delete_sources`）。
 
 ## 实现选择（按场景跳转）
 

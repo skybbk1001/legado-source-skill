@@ -14,9 +14,9 @@ argument-hint: "[站点URL或描述]"
 
 ## 角色分工
 
-AI：使用curl、Playwright MCP（DOM、Network XHR）、Nodejs、读文件等方法分析网站并制作书源。
+AI：使用curl、Playwright MCP（DOM、Network XHR）、Nodejs、读文件等方法分析网站并制作书源。装有 legado MCP（工具名 `mcp__legado__*`）时，还能直连运行中的阅读T推送书源、跑 App 内调试、读 HTTP 请求日志，自行完成实测闭环（Phase 7）。
 
-用户：导入书源到 App 实测，反馈现象（截图、报错、章节缺失）。
+用户：legado MCP 不可用时导入书源到 App 实测，反馈现象（截图、报错、章节缺失）；使用 MCP 前开启手机「Web 服务」。
 
 ## 核心原则
 
@@ -179,9 +179,23 @@ node <skill目录>/scripts/validate-jssource.js path/to/source.js
 JSON 源检查：必填字段是否缺失、`@js:` / `<js>` 块用 `vm.Script` 原样编译（与 Legado 一致）是否有语法错误、字段名是否在 [[references/fields.md]] 合法范围内。
 JS 源检查：整文件语法、Rhino 不兼容语法、`java.*` 是否在 JsExtensions 面内、source 必填键与类型、三个必备函数存在。
 
-全部通过 → 交付书源（JSON 或 `.js` 文件），清理 `tmp/`。有报错 → 修正后重跑。
+全部通过 → legado MCP 可用时进入 Phase 7 闭环实测；否则交付书源（JSON 或 `.js` 文件）由用户导入验证，清理 `tmp/`。有报错 → 修正后重跑。
 
 交付前检查：搜索和发现条目含绝对 `bookUrl`；章节含有效 `title`/`url`；正文非空且无挑战页/乱码；分页末页返回空并停止；图片源确认 Referer；纯 JS 的 `bookSourceType` 与结果对象 `type` 使用各自契约。
+
+---
+
+### Phase 7: App 内闭环实测（legado MCP 可用时）
+
+**目标：** 在真实 App 环境跑通全管线，交付已验证的源。
+
+`save_source` 推送（返回 bookSourceUrl）→ `debug_source` 调试 → 失败时 `get_http_logs` / `get_http_log` 看 App 实发请求 → 改源重推 → 复测。
+
+`debug_source` 的 key 决定入口：普通关键词=搜索→详情→目录→正文全管线；绝对URL=详情起步；`::URL`=发现页；`++URL`=仅目录；`--URL`=仅正文。改动只涉及单步时用前缀分步复测，省整链耗时。
+
+`get_http_log` 的价值是 App 实发请求头（CookieStore/UA/重定向）与 Phase 2 采集时的差异对比；正文在 App 记录时截断至 4096 字符，完整响应体以 `tmp/` 存档为准。HTTP 日志需 App 设置开启「记录HTTP日志」。
+
+**验证门：** 搜索/详情/目录/正文（+发现，如有）日志全绿 → 交付源文件，清理 `tmp/`。测试源已在 App 内即成品。
 
 ## 实现选择（按场景跳转）
 
@@ -200,3 +214,4 @@ JS 源检查：整文件语法、Rhino 不兼容语法、`java.*` 是否在 JsEx
 | 找具体站点类型起手骨架（HTML网页、JSON API、登录、漫画）                 | —                                                     | [[references/site-templates.md]]                         |
 | 纯JS单文件源：config 键、四函数契约、运行环境、迁移映射                  | —                                                     | [[references/js-source-format.md]]                       |
 | JS 源字符串操作报错/判空失灵（正则 `replace`、`split`、`length`、`===`） | Java 来源值先 `String(...)` 归一化                    | [[references/js-source-format.md]] §运行环境             |
+| App 内实测：推送书源、跑调试管线、看 App 实发请求                        | legado MCP：save_source / debug_source / get_http_log | 本文 Phase 7                                             |

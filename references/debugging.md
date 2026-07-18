@@ -26,13 +26,14 @@ curl -i -A 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36' \
 
 把 HTML 喂给本地 Node + cheerio，验证选择器。
 
-### 4. 让用户在 App 里实测（你无法做）
+### 4. App 里实测
 
-交付书源（JSON / `.js`）时同时请他们反馈结果
+装有 legado MCP 时直连阅读T：`save_source` 推送 → `debug_source` 跑管线 → `get_http_logs`/`get_http_log` 看 App 实发请求（SKILL.md Phase 7）。
+MCP 不可用时交付书源（JSON / `.js`）请用户导入实测并反馈结果。
 
-### 5. JS 运行时值（用户帮忙打）
+### 5. JS 运行时值
 
-需要看 App 内 JS 运行时变量时，让用户临时加：
+源里加 `java.log(...)` 后，输出出现在 `debug_source` 返回的日志里（MCP 可用时自己看，否则让用户在调试页看）：
 
 ```js
 java.log("got url: " + url);

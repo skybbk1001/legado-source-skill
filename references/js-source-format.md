@@ -6,7 +6,9 @@
 交付物是 `.js` 文件，用户在源管理页"新建JS源"粘贴，或直接导入 `.js` 文件/直链。
 
 引擎侧事实源：`JsSourceConfig`（提取校验）、`JsSourceEngine`（调用）、`JsSourceMarshaller`（返回值落库）。
-App 内置模板：`app/src/main/assets/js_source_template.js`（含 JSDoc typedef，可直接作起手骨架）。
+App 内置模板：`app/src/main/assets/js_source_template.js`（可直接作起手骨架）。
+交付源的注释风格与模板一致：函数 JSDoc 每参一行，`@returns` 类型槽内联字段形状，
+定界符与形状用空格隔开（如 `{ [{name, bookUrl, author, ...}] }`），契约细节由本文承载。
 
 ## 骨架
 

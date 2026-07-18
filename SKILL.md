@@ -193,7 +193,7 @@ JS 源检查：整文件语法、Rhino 不兼容语法、`java.*` 是否在 JsEx
 
 `debug_source` 的 key 决定入口：普通关键词=搜索→详情→目录→正文全管线；绝对URL=详情起步；`::URL`=发现页；`++URL`=仅目录；`--URL`=仅正文。改动只涉及单步时用前缀分步复测，省整链耗时。
 
-`get_http_log` 的价值是 App 实发请求头（CookieStore/UA/重定向）与 Phase 2 采集时的差异对比；正文在 App 记录时截断至 4096 字符，完整响应体以 `tmp/` 存档为准。HTTP 日志需 App 设置开启「记录HTTP日志」。
+`get_http_log` 的价值是 App 实发请求头（CookieStore/UA/重定向）与 Phase 2 采集时的差异对比；正文在 App 记录时截断至 4096 字符，完整响应体以 `tmp/` 存档为准。HTTP 日志需开启「记录HTTP日志」：`set_http_log_recording(true)` 远程开启，验收收尾时关闭。
 
 **验证门：** 搜索/详情/目录/正文（+发现，如有）日志全绿 → 交付源文件，清理 `tmp/`。测试源已在 App 内即成品。
 

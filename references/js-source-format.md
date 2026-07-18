@@ -33,7 +33,9 @@ function getContent(chapter, book) { /* 返回正文字符串 */ }
 ## source 配置
 
 键名与 BookSource 实体字段逐字对应（GSON 直转）。常用可选键：
-`header`（JSON 字符串）、`loginUrl`/`loginUi`/`loginCheckJs`（登录，同声明式）、
+`header`（JSON 字符串）、`loginUrl`（登录页地址，WebView 登录）、`loginUi`（表单登录，
+RowUi 数组 `[{name, type, action?}]`，与顶层 `login` 函数成对，声明未实现导入时报错；
+每项须非空 `name`，空数组视同未声明；`loginCheckJs` 对 JS 源无消费）、
 `concurrentRate`、`enabledCookieJar`、`jsLib`（本源所有函数共用的库文本）、
 `bookSourceGroup`、`bookSourceComment`、`variableComment`。
 
@@ -57,8 +59,16 @@ function getContent(chapter, book) { /* 返回正文字符串 */ }
 | `getBookInfo(book)` | 书籍对象（已含 search 阶段字段） | 覆盖字段对象 |
 | `getChapters(book)` | 书籍对象 | `Chapter[]`，数组序即目录序 |
 | `getContent(chapter, book)` | 章节、书籍对象；另有绑定 `nextChapterUrl`（可能 null） | 正文字符串，空即失败 |
+| `login()` | 无参；`source.getLoginInfo()` 读表单数据（JSON 字符串） | 无返回值要求；`throw` 即失败，内容作为提示 |
 
 返回数组/对象或 `JSON.stringify` 字符串均可（引擎收字符串直接解析，收对象自动转 JSON）。
+
+**登录**：WebView 形态只声明 `loginUrl`；表单形态声明 `loginUi` + 实现 `login`。
+提交流程=表单数据 AES 存储（`source.getLoginInfo()` 可读）→ 调 `login`；成功后
+`source.putLoginHeader(json)` 存登录头（本源后续请求自动附带，含 `Cookie` 键同步写
+CookieStore）。button 项 `action` 在脚本作用域执行，绑定 `result`=当前表单数据对象；
+填 `http(s)` 地址则点击打开浏览器。管理列表与编辑器菜单的"登录"入口由
+`loginUrl`/`loginUi` 任一非空点亮。
 
 **SearchBook**：`name`、`bookUrl` 必填，缺失的条目被丢弃；`bookUrl`/`tocUrl` 需绝对地址
 （search/explore 结果不做相对补全）。可选 `author`/`kind`（逗号分隔）/`coverUrl`/`intro`/

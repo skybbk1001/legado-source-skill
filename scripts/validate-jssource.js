@@ -124,7 +124,7 @@ function main() {
     const context = vm.createContext({});
     probe = vm.runInContext(
       text + '\n;({ sourceType: typeof source,' +
-        ' fns: [typeof search, typeof getBookInfo, typeof getChapters, typeof getContent, typeof explore],' +
+        ' fns: [typeof search, typeof getBookInfo, typeof getChapters, typeof getContent, typeof explore, typeof login],' +
         ' config: typeof source === "object" ? source : null })',
       context, { timeout: 3000 });
   } catch (e) {
@@ -150,7 +150,7 @@ function main() {
         else if (!VALID_CONFIG_KEYS.has(k)) warnings.push(`source 未知键: ${k}`);
       }
     }
-    const [s, gbi, gc, gct, exp] = probe.fns;
+    const [s, gbi, gc, gct, exp, lgn] = probe.fns;
     [['search', s], ['getChapters', gc], ['getContent', gct]].forEach(([name, t]) => {
       if (t !== 'function') errors.push(`缺少必备函数 ${name}`);
     });
@@ -168,6 +168,19 @@ function main() {
       }
       if (declared && exp !== 'function') {
         errors.push('声明了 exploreUrl 须配对实现 explore(url, page) — 契约同 search');
+      }
+      const lu = probe.config.loginUi;
+      // 提取侧语义:数组=RowUi 项列表(空数组视同未声明),字符串=JSON 文本
+      const luDeclared = Array.isArray(lu) ? lu.length > 0 : (typeof lu === 'string' && lu !== '');
+      if (Array.isArray(lu)) {
+        lu.forEach((item, i) => {
+          if (!item || typeof item !== 'object' || typeof item.name !== 'string' || !item.name.trim()) {
+            errors.push(`loginUi 第 ${i + 1} 项缺少非空 name — 导入时报错`);
+          }
+        });
+      }
+      if (luDeclared && lgn !== 'function') {
+        errors.push('声明了 loginUi 须配对实现 login() — 表单登录提交时调用');
       }
     }
   }

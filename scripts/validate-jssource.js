@@ -124,7 +124,7 @@ function main() {
     const context = vm.createContext({});
     probe = vm.runInContext(
       text + '\n;({ sourceType: typeof source,' +
-        ' fns: [typeof search, typeof getBookInfo, typeof getChapters, typeof getContent, typeof explore, typeof login],' +
+        ' fns: [typeof search, typeof getBookInfo, typeof getChapters, typeof getContent, typeof explore, typeof login, typeof getReviewSummary, typeof getReviewDetail],' +
         ' config: typeof source === "object" ? source : null })',
       context, { timeout: 3000 });
   } catch (e) {
@@ -150,7 +150,7 @@ function main() {
         else if (!VALID_CONFIG_KEYS.has(k)) warnings.push(`source 未知键: ${k}`);
       }
     }
-    const [s, gbi, gc, gct, exp, lgn] = probe.fns;
+    const [s, gbi, gc, gct, exp, lgn, rs, rd] = probe.fns;
     [['search', s], ['getChapters', gc], ['getContent', gct]].forEach(([name, t]) => {
       if (t !== 'function') errors.push(`缺少必备函数 ${name}`);
     });
@@ -182,6 +182,9 @@ function main() {
       if (luDeclared && lgn !== 'function') {
         errors.push('声明了 loginUi 须配对实现 login() — 表单登录提交时调用');
       }
+    }
+    if ((rs === 'function' && rd !== 'function') || (rd === 'function' && rs !== 'function')) {
+      errors.push('getReviewSummary 与 getReviewDetail 须配对实现 — 两函数同时声明或同时不声明');
     }
   }
 

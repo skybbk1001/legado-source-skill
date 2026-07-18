@@ -60,6 +60,8 @@ RowUi 数组 `[{name, type, action?}]`，与顶层 `login` 函数成对，声明
 | `getChapters(book)` | 书籍对象 | `Chapter[]`，数组序即目录序 |
 | `getContent(chapter, book)` | 章节、书籍对象；另有绑定 `nextChapterUrl`（可能 null） | 正文字符串，空即失败 |
 | `login()` | 无参；`source.getLoginInfo()` 读表单数据（JSON 字符串） | 无返回值要求；`throw` 即失败，内容作为提示 |
+| `getReviewSummary(chapter, book)` | `chapter`/`book` | `[{paraIndex, count, paraData?}]` 数组或 JSON 字符串 |
+| `getReviewDetail(chapter, book, paraIndex, paraData, page)` | 同上 + `paraIndex`（段落序号）/`paraData`（summary 附加数据）/`page`（页码从 1 起） | `{items: [{content, ...}], nextPageUrl?}` 对象或 JSON 字符串 |
 
 返回数组/对象或 `JSON.stringify` 字符串均可（引擎收字符串直接解析，收对象自动转 JSON）。
 
@@ -69,6 +71,19 @@ RowUi 数组 `[{name, type, action?}]`，与顶层 `login` 函数成对，声明
 CookieStore）。button 项 `action` 在脚本作用域执行，绑定 `result`=当前表单数据对象；
 填 `http(s)` 地址则点击打开浏览器。管理列表与编辑器菜单的"登录"入口由
 `loginUrl`/`loginUi` 任一非空点亮。
+
+**段评**：正文段落级评论，`getReviewSummary` + `getReviewDetail` 成对声明即启用，缺一在导入/
+保存时报错（同 `explore`↔`exploreUrl`）。两阶段：章节加载后调 `getReviewSummary(chapter, book)`
+批量取每段评论数，返回 `[{paraIndex, count, paraData?}]`——`paraIndex` 段落序号 1-based（对应正文
+第 N 段）、`count`≤0 的条目忽略不显示图标、`paraData`（可选）透传给 detail 的附加数据（token/段落
+哈希等），缺省时默认取 `paraIndex` 字符串。点击某段图标时调
+`getReviewDetail(chapter, book, paraIndex, paraData, page)` 按需取列表并翻页，返回
+`{items, nextPageUrl?}`：`items` 每项仅 `content` 必填（缺失丢弃），可选 `id`（建议提供，翻页去重
+用）/`name`（缺失显示"匿名"）/`avatar`/`badge`（徽章文本，显示在用户名旁）/`replies`（子评论数组，
+结构同主评论、递归嵌套；UI 最多两层，更深层级平铺展示）。`nextPageUrl` 只是"有没有下一页"的信号
+——非空即允许继续翻页、null/缺失表示到底，其值不回传函数；翻页由应用递增 `page` 后重调
+`getReviewDetail`，下一页请求用递增后的 `page` 自行拼接（`nextPageUrl` 填任意非空值即可）。错误处理
+同其他函数：`throw` 弹 toast，返回空数组/空 `items` 静默表示无内容。
 
 **SearchBook**：`name`、`bookUrl` 必填，缺失的条目被丢弃；`bookUrl`/`tocUrl` 需绝对地址
 （search/explore 结果不做相对补全）。可选 `author`/`kind`（逗号分隔）/`coverUrl`/`intro`/

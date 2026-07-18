@@ -16,7 +16,7 @@ argument-hint: "[站点URL或描述]"
 
 AI：使用curl、Playwright MCP（DOM、Network XHR）、Nodejs、读文件等方法分析网站并制作书源。装有 legado MCP（工具名 `mcp__legado__*`）时，还能直连运行中的阅读T推送书源、跑 App 内调试、读 HTTP 请求日志，自行完成实测闭环（Phase 7）。
 
-用户：legado MCP 不可用时导入书源到 App 实测，反馈现象（截图、报错、章节缺失）；使用 MCP 前开启手机「Web 服务」。
+用户：legado MCP 不可用时导入书源到 App 实测，反馈现象（截图、报错、章节缺失）；使用 MCP 前开启手机「MCP 服务」（设置页，与 Web 服务独立，注册命令见主仓 api.md 的 MCP 小节）。
 
 ## 核心原则
 

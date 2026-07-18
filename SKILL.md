@@ -14,15 +14,15 @@ argument-hint: "[站点URL或描述]"
 
 ## 角色分工
 
-AI：使用curl、Playwright MCP（DOM、Network XHR）、Nodejs、读文件等方法分析网站并制作书源。装有 legado MCP（工具名 `mcp__legado__*`）时，还能直连运行中的阅读T推送书源、跑 App 内调试、读 HTTP 请求日志，自行完成实测闭环（Phase 7）。
+AI：使用 curl、Playwright MCP（DOM、Network XHR）、Node.js、读文件等方法分析网站并制作书源。装有 legado MCP 时，还能直连运行中的阅读T推送书源、跑 App 内调试、读 HTTP 请求日志，自行完成实测闭环（Phase 7）。工具短名见 Phase 7。
 
 用户：legado MCP 不可用时导入书源到 App 实测，反馈现象（截图、报错、章节缺失）；使用 MCP 前开启手机「MCP 服务」（设置页，与 Web 服务独立，注册命令见主仓 api.md 的 MCP 小节）。
 
 ## 核心原则
 
-1. 实事求是 — 靠推理写源，不猜测
-2. API 优先 — Playwright Network 看 XHR；JSON API 反爬弱
-3. 选择器唯一 — 抓完整HTML确保选择器唯一
+1. 实事求是 — 依据已验证的响应和运行结果写源，不把推测当事实
+2. API 优先 — 优先观察 Network 中的真实接口；API 通常比页面选择器稳定，但仍需验证鉴权和反爬
+3. 选择器可验证 — 优先使用稳定、范围最小且能唯一定位目标的选择器，并用完整响应确认
 
 ## 任务分流与源格式
 
@@ -39,18 +39,28 @@ AI：使用curl、Playwright MCP（DOM、Network XHR）、Nodejs、读文件等�
 | 发现页   | 支持（`exploreUrl` 分类 + `explore` 函数成对）            | 支持                                        |
 | 契约参考 | [[references/js-source-format.md]]                        | [[references/fields.md]]                    |
 
-Phase 1-4（侦察/采集/分析/验证）与格式无关，照常执行；Phase 5/6 按格式分叉。
+Phase 1-4（侦察/采集/分析/验证）与格式无关，按任务复杂度选择起点；Phase 5/6 按格式分叉。
 
 ## 工作流
 
-按逆向工程标准流程分阶段执行，每阶段有验证门，不通过不进入下一阶段。各阶段保存文件到当前工作目录的 `tmp/` 子目录（不存在则创建）。
+按逆向工程标准流程分阶段执行，每阶段有验证门，不通过不进入下一阶段。默认将中间产物保存到当前工作目录的 `tmp/<source-id>/` 子目录（不存在则创建）；每个书源使用独立目录，`source-id` 由书源名或域名生成并清理为安全的短目录名。简单任务可减少中间文件，交付前删除敏感响应和临时数据。
+
+### 快速路径
+
+不要机械执行所有阶段，根据已有信息选择起点：
+
+- 只有站点 URL 或“帮我找规则”：从 Phase 1 开始。
+- 用户已提供完整 HTML/JSON 和接口契约：从 Phase 3 开始。
+- 用户只要求修复已有规则或报错：定位对应函数/规则后直接验证。
+- 用户明确要求纯 JS 或声明式 JSON：遵循用户要求，不重新进行格式选择。
+- 无法访问站点但用户提供了完整响应样本：基于样本实现，并明确未经过真实请求验证。
 
 ### Phase 1: 侦察
 
 **目标：** 搞清站点技术架构和反爬级别。
 
 1. curl 请求首页，检测响应：
-   - 正常 HTML → 保存 `tmp/home.html`，记录 L0
+   - 正常 HTML → 保存 `tmp/<source-id>/home.html`，记录 L0
    - 被拦 → 按下方阶梯逐级升级直到拿到 HTML
 2. 从 HTML 识别：技术栈（纯 HTML / SPA / SSR+CSR）、域名关系、加密库引用
 3. 识别入口：搜索表单/URL、分类导航、发现页
@@ -68,7 +78,7 @@ Phase 1-4（侦察/采集/分析/验证）与格式无关，照常执行；Phase
 
 记录每个端点生效的 Level（不同端点可能不同，如搜索 L1 + 正文 L0）。书源配置映射见 Phase 5。
 
-**验证门：** 首页 HTML 可获取 → 记录 Level，进入 Phase 2。L3 仍失败 → 站点不可用，终止。
+**验证门：** 首页 HTML 可获取 → 记录实际成功的 Level，进入 Phase 2。L3 仍失败 → 说明当前采集路径受阻，并在可行时请求用户手动验证或提供响应样本。
 
 ---
 
@@ -80,15 +90,15 @@ Phase 1-4（侦察/采集/分析/验证）与格式无关，照常执行；Phase
 
 | 步骤     | 操作           | 保存                                     |
 | -------- | -------------- | ---------------------------------------- |
-| 搜索     | 输入关键词搜索 | tmp/search.html                          |
-| 搜索翻页 | 第2、3页       | tmp/search_p2.html, tmp/search_p3.html   |
-| 详情     | 点击一本书     | tmp/detail.html                          |
-| 目录     | 进入目录页     | tmp/catalog.html                         |
-| 目录翻页 | 目录第2、3页   | tmp/catalog_p2.html, tmp/catalog_p3.html |
-| 正文     | 打开一个章节   | tmp/content.html                         |
-| 正文翻页 | 正文第2、3页   | tmp/content_p2.html, tmp/content_p3.html |
+| 搜索     | 输入关键词搜索 | tmp/<source-id>/search.html                          |
+| 搜索翻页 | 第2、3页       | tmp/<source-id>/search_p2.html, tmp/<source-id>/search_p3.html   |
+| 详情     | 点击一本书     | tmp/<source-id>/detail.html                          |
+| 目录     | 进入目录页     | tmp/<source-id>/catalog.html                         |
+| 目录翻页 | 目录第2、3页   | tmp/<source-id>/catalog_p2.html, tmp/<source-id>/catalog_p3.html |
+| 正文     | 打开一个章节   | tmp/<source-id>/content.html                         |
+| 正文翻页 | 正文第2、3页   | tmp/<source-id>/content_p2.html, tmp/<source-id>/content_p3.html |
 
-每步保存后追加 `tmp/notes.md`：URL 模板、HTTP 方法、反爬级别、翻页参数规律、选择器线索、加密/签名/重定向备注。
+每步保存后追加 `tmp/<source-id>/notes.md`：URL 模板、HTTP 方法、反爬级别、翻页参数规律、选择器线索、加密/签名/重定向备注。
 
 **验证门：** 每个 HTML 含有效数据（非空/非报错/非挑战页）？是 → Phase 3。否 → 对该端点升级反爬级别重试。
 
@@ -98,18 +108,18 @@ Phase 1-4（侦察/采集/分析/验证）与格式无关，照常执行；Phase
 
 **目标：** 逆向数据流，确定输入→输出映射和选择器。
 
-从 Phase 2 的 HTML 和 `tmp/notes.md` 分析，每个环节回答：输入是什么 → 怎么取（选择器/JS）→ 输出是什么。
+从 Phase 2 的 HTML 和 `tmp/<source-id>/notes.md` 分析，每个环节回答：输入是什么 → 怎么取（选择器/JS）→ 输出是什么。
 
 | 环节     | 输入       | 输出                | 分析来源                                         |
 | -------- | ---------- | ------------------- | ------------------------------------------------ |
-| 搜索     | keyword    | bookUrl 列表        | tmp/search.html                                  |
+| 搜索     | keyword    | bookUrl 列表        | tmp/<source-id>/search.html                                  |
 | 搜索翻页 | 第1页      | page 参数规律       | search.html → search_p2.html → search_p3.html    |
-| 详情     | bookUrl    | tocUrl + 元数据     | tmp/detail.html                                  |
-| 目录     | tocUrl     | chapterUrl 列表     | tmp/catalog.html                                 |
+| 详情     | bookUrl    | tocUrl + 元数据     | tmp/<source-id>/detail.html                                  |
+| 目录     | tocUrl     | chapterUrl 列表     | tmp/<source-id>/catalog.html                                 |
 | 目录翻页 | 第1页      | nextTocUrl 规律     | catalog.html → catalog_p2.html → catalog_p3.html |
-| 正文     | chapterUrl | content 文本        | tmp/content.html                                 |
+| 正文     | chapterUrl | content 文本        | tmp/<source-id>/content.html                                 |
 | 正文翻页 | 第1页      | nextContentUrl 规律 | content.html → content_p2.html → content_p3.html |
-| 发现     | 分类URL    | bookUrl 列表        | tmp/home.html                                    |
+| 发现     | 分类URL    | bookUrl 列表        | tmp/<source-id>/home.html                                    |
 
 验证选择器唯一性，分析 URL 加密/解密逻辑，确认翻页参数规律一致。
 
@@ -121,7 +131,7 @@ Phase 1-4（侦察/采集/分析/验证）与格式无关，照常执行；Phase
 
 **目标：** 用 Node.js 脚本验证分析结果，确保选择器和加密逻辑正确，再写书源。
 
-编写 `tmp/verify.js`，逐环节发请求验证。默认只使用 Node 内置 `fetch`、`URL` 和断言；JSON/API 验证不得要求第三方包。只有需要离线执行 CSS 选择器时，才可选安装 `cheerio`，并在脚本开头明确标注该依赖。每步间隔 2s 避免风控。Phase 3 的分析结果填入配置对象。
+在 `tmp/<source-id>/verify.js` 中逐环节发请求验证。默认只使用 Node 内置 `fetch`、`URL` 和断言；JSON/API 验证不得要求第三方包。只有需要离线执行 CSS 选择器时，才可选安装 `cheerio`，并在脚本开头明确标注该依赖。请求默认间隔 2s；遇到限流时增加间隔，站点明确允许时才降低。Phase 3 的分析结果填入配置对象。
 
 可选依赖：`npm install --no-save cheerio`。Playwright 侦察使用现有浏览器工具，不作为 `verify.js` 的 Node 依赖。
 
@@ -138,7 +148,7 @@ Phase 1-4（侦察/采集/分析/验证）与格式无关，照常执行；Phase
 | 加解密   | 函数输出与浏览器一致（如有）            |
 
 ```bash
-node tmp/verify.js
+node tmp/<source-id>/verify.js
 ```
 
 全部 PASS → Phase 5。有 FAIL → 回 Phase 3 修正。
@@ -149,9 +159,9 @@ node tmp/verify.js
 
 **目标：** 按 Phase 3 的数据流图和 Phase 4 的验证结果写源。
 
-**反爬：** 按 Phase 1/2 记录的 Level 查 [[references/anti-bot.md]] 配置对应字段（L0=仅 UA、L1=+Referer+CookieJar、L2=+webView、L3=+startBrowserAwait）。
+**反爬：** 按 Phase 1/2 实际验证的 Level 查 [[references/anti-bot.md]] 配置对应字段（L0=仅 UA、L1=按需增加 Referer/CookieJar、L2=尝试 webView、L3 通常转人工浏览器验证，必要时使用 `startBrowserAwait`）。不要把推测的 Level 当成已验证事实。
 
-**纯JS单文件源（推荐）**：按 [[references/js-source-format.md]] 写 `.js`（source 配置 → search → getBookInfo → getChapters → getContent）。Phase 4 `tmp/verify.js` 验证过的解析逻辑逐行迁移进函数体（`fetch`→`java.ajax`、`cheerio`→`org.jsoup`，映射表见该参考文末）。
+**纯JS单文件源（推荐）**：按 [[references/js-source-format.md]] 写 `.js`（`source` 配置 → `search` → `getChapters` → `getContent`；`getBookInfo` 按需实现）。将 Phase 4 `tmp/<source-id>/verify.js` 验证过的数据流和解析逻辑迁移进函数体，不要机械复制异步控制流（`fetch`→`java.ajax`、`cheerio`→`org.jsoup`，映射表见该参考文末）。
 
 **声明式 JSON 源**：从 [[references/fields.md]] 预填充字段，写源过程中查看 [[references/rule-syntax.md]] 和 [[references/js-api.md]]。按数据流顺序实现：
 
@@ -160,7 +170,7 @@ node tmp/verify.js
 3. 详情（ruleBookInfo）
 4. 目录（ruleToc，含翻页）
 5. 正文（ruleContent，含翻页）
-6. 发现（exploreUrl + ruleExplore）
+6. 发现（如需要，再实现 `exploreUrl` + `ruleExplore`）
 
 ---
 
@@ -177,25 +187,25 @@ node <skill目录>/scripts/validate-jssource.js path/to/source.js
 ```
 
 JSON 源检查：必填字段是否缺失、`@js:` / `<js>` 块用 `vm.Script` 原样编译（与 Legado 一致）是否有语法错误、字段名是否在 [[references/fields.md]] 合法范围内。
-JS 源检查：整文件语法、Rhino 不兼容语法、`java.*` 是否在 JsExtensions 面内、source 必填键与类型、三个必备函数存在。
+JS 源检查：整文件语法、Rhino 不兼容语法、`java.*` 是否在 JsExtensions 面内、`source` 配置键与类型、必备函数契约是否满足。
 
-全部通过 → legado MCP 可用时进入 Phase 7 闭环实测；否则交付书源（JSON 或 `.js` 文件）由用户导入验证，清理 `tmp/`。有报错 → 修正后重跑。
+全部通过 → legado MCP 可用时进入 Phase 7 闭环实测；否则交付书源（JSON 或 `.js` 文件）由用户导入验证，清理 `tmp/<source-id>/`。有报错 → 修正后重跑。
 
-交付前检查：搜索和发现条目含绝对 `bookUrl`；章节含有效 `title`/`url`；正文非空且无挑战页/乱码；分页末页返回空并停止；图片源确认 Referer；纯 JS 的 `bookSourceType` 与结果对象 `type` 使用各自契约。
+交付前检查：搜索条目和启用的发现条目含绝对 `bookUrl`；章节含有效 `title`/`url`；正文非空且无挑战页/乱码；声明式分页的末页返回空，纯 JS 分页遵循其返回值契约并能停止；存在图片资源或防盗链时确认 Referer；纯 JS 的 `bookSourceType` 与结果对象 `type` 使用各自契约。
 
 ---
 
 ### Phase 7: App 内闭环实测（legado MCP 可用时）
 
-工具名形如 `mcp__legado__save_source`，以此类推（下文用短名）。
+legado MCP 的工具短名为 `save_source`、`debug_source`、`list_sources`、`get_source`、`delete_sources`、`get_http_logs`、`get_http_log`、`set_http_log_recording`。客户端展示的完整工具名可能带服务前缀，下文统一使用短名。
 
 **流程：** `save_source` 推送（返回 bookSourceUrl）→ `debug_source` 调试 → 日志看不出原因时 `set_http_log_recording(true)` 开日志再跑一次 → `get_http_logs` / `get_http_log` 看 App 实发请求头（CookieStore/UA/重定向）→ 改源重推 → 复测 → 收尾 `set_http_log_recording(false)`。
 
 `debug_source` 的 key 决定入口：普通关键词=搜索→详情→目录→正文全管线；绝对URL=详情起步；`::URL`=发现页；`++URL`=仅目录；`--URL`=仅正文。改动只涉及单步时用前缀分步复测，省整链耗时。
 
-`get_http_log` 正文记录时截断至 4096 字符，完整响应体以 `tmp/` 存档为准。
+`get_http_log` 的响应体在 App 记录时会截断至 4096 字符；PC 侧 `tmp/<source-id>/` 中的同请求采集结果只能作参考，不能视为 App 返回体的完整替代。
 
-**验证门：** 搜索/详情/目录/正文（+发现，如有）日志全绿 → `list_sources` 确认源在 App 内 → 交付源文件，清理 `tmp/`（测试源已是成品，无需删除；删除用 `delete_sources`）。
+**验证门：** 搜索/详情/目录/正文（+发现，如有）日志全绿 → `list_sources` 确认源在 App 内 → 交付源文件，清理 `tmp/<source-id>/`（测试源已是成品，无需删除；删除用 `delete_sources`）。
 
 ## 实现选择（按场景跳转）
 

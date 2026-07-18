@@ -138,7 +138,7 @@ CookieStore）。button 项 `action` 在脚本作用域执行，绑定 `result`=
 
 ## Phase 4 → mainJs 迁移映射
 
-verify.js（node）验证过的逻辑逐行迁移：
+将 verify.js（Node.js）验证过的数据流和解析逻辑迁移到书源函数，不要机械复制异步控制流：
 
 | verify.js | mainJs |
 |---|---|

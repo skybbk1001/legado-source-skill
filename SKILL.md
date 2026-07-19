@@ -161,7 +161,7 @@ node tmp/<source-id>/verify.js
 
 **反爬：** 按 Phase 1/2 实际验证的 Level 查 [[references/anti-bot.md]] 配置对应字段（L0=仅 UA、L1=按需增加 Referer/CookieJar、L2=尝试 webView、L3 通常转人工浏览器验证，必要时使用 `startBrowserAwait`）。不要把推测的 Level 当成已验证事实。
 
-**纯JS单文件源（推荐）**：按 [[references/js-source-format.md]] 写 `.js`（`source` 配置 → `search` → `getChapters` → `getContent`；`getBookInfo` 按需实现）。将 Phase 4 `tmp/<source-id>/verify.js` 验证过的数据流和解析逻辑迁移进函数体，不要机械复制异步控制流（`fetch`→`java.ajax`、`cheerio`→`org.jsoup`，映射表见该参考文末）。
+**纯JS单文件源（推荐）**：按 [[references/js-source-format.md]] 写 `.js`（`config` 配置 → `search` → `getChapters` → `getContent`；`getBookInfo` 按需实现）。将 Phase 4 `tmp/<source-id>/verify.js` 验证过的数据流和解析逻辑迁移进函数体，不要机械复制异步控制流（`fetch`→`java.ajax`、`cheerio`→`org.jsoup`，映射表见该参考文末）。
 
 **声明式 JSON 源**：从 [[references/fields.md]] 预填充字段，写源过程中查看 [[references/rule-syntax.md]] 和 [[references/js-api.md]]。按数据流顺序实现：
 
@@ -187,7 +187,7 @@ node <skill目录>/scripts/validate-jssource.js path/to/source.js
 ```
 
 JSON 源检查：必填字段是否缺失、`@js:` / `<js>` 块用 `vm.Script` 原样编译（与 Legado 一致）是否有语法错误、字段名是否在 [[references/fields.md]] 合法范围内。
-JS 源检查：整文件语法、Rhino 不兼容语法、`java.*` 是否在 JsExtensions 面内、`source` 配置键与类型、必备函数契约是否满足。
+JS 源检查：整文件语法、Rhino 不兼容语法、`java.*` 是否在 JsExtensions 面内、`config` 配置键与类型、必备函数契约是否满足。
 
 全部通过 → legado MCP 可用时进入 Phase 7 闭环实测；否则交付书源（JSON 或 `.js` 文件）由用户导入验证，清理 `tmp/<source-id>/`。有报错 → 修正后重跑。
 

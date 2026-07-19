@@ -1,8 +1,8 @@
 # 纯JS单文件书源（仅本 fork）
 
-一个 `.js` 文件即一个完整书源：顶层为一个 `source` 配置对象与若干 `function` 声明，声明即生效。
+一个 `.js` 文件即一个完整书源：顶层为一个 `config` 配置对象与若干 `function` 声明，声明即生效。
 `search` / `getChapters` / `getContent` 必备（缺失在导入/保存时报错），`getBookInfo` 可选，
-`explore` 与 `source.exploreUrl` 成对（声明分类未实现函数在导入时报错）。
+`explore` 与 `config.exploreUrl` 成对（声明分类未实现函数在导入时报错）。
 交付物是 `.js` 文件，用户在源管理页"新建JS源"粘贴，或直接导入 `.js` 文件/直链。
 
 引擎侧事实源：`JsSourceConfig`（提取校验）、`JsSourceEngine`（调用）、`JsSourceMarshaller`（返回值落库）。
@@ -13,30 +13,41 @@ App 内置模板：`app/src/main/assets/js_source_template.js`（可直接作起
 ## 骨架
 
 ```js
-const source = {
+const config = {
   bookSourceUrl: "https://example.com", // 必填,主键;修改即成为新源
-  bookSourceName: "示例JS源",           // 必填
-  bookSourceType: 0,                    // 0文本 1音频 2图片 3下载站
-  exploreUrl: [                         // 发现分类(可选,数组首选);与 explore 函数成对
+  bookSourceName: "示例JS源", // 必填
+  bookSourceType: 0, // 0文本 1音频 2图片 3下载站
+  exploreUrl: [
+    // 发现分类(可选,数组首选);与 explore 函数成对
     { title: "玄幻", url: "https://example.com/sort/1.html" },
   ],
-  lastUpdateTime: 0                     // 版本时间戳,写死毫秒数值,发新版时调大;同 URL 重复导入大于库内值才提示"更新"
-}
+  lastUpdateTime: 0, // 版本时间戳,写死毫秒数值,发新版时调大;同 URL 重复导入大于库内值才提示"更新"
+};
 
-function search(key, page) { /* 返回 SearchBook[] */ }
-function explore(url, page) { /* 可选,与 source.exploreUrl 成对,返回 SearchBook[] */ }
-function getBookInfo(book) { /* 可选,返回覆盖字段对象 */ }
-function getChapters(book) { /* 返回 Chapter[] */ }
-function getContent(chapter, book) { /* 返回正文字符串 */ }
+function search(key, page) {
+  /* 返回 SearchBook[] */
+}
+function explore(url, page) {
+  /* 可选,与 config.exploreUrl 成对,返回 SearchBook[] */
+}
+function getBookInfo(book) {
+  /* 可选,返回覆盖字段对象 */
+}
+function getChapters(book) {
+  /* 返回 Chapter[] */
+}
+function getContent(chapter, book) {
+  /* 返回正文字符串 */
+}
 ```
 
-## source 配置
+## config 配置
 
 键名与 BookSource 实体字段逐字对应（GSON 直转）。常用可选键：
 `header`（JSON 字符串）、`loginUrl`（登录页地址，WebView 登录）、`loginUi`（表单登录，
 RowUi 数组 `[{name, type, action?}]`，与顶层 `login` 函数成对，声明未实现导入时报错；
 每项须非空 `name`，空数组视同未声明；`loginCheckJs` 对 JS 源无消费）、
-`concurrentRate`、`enabledCookieJar`、`jsLib`（本源所有函数共用的库文本）、
+`concurrentRate`、`enabledCookieJar`、
 `bookSourceGroup`、`bookSourceComment`、`variableComment`。
 
 - `enabled`/`customOrder` 等用户态字段由应用维护，脚本值不生效。
@@ -52,15 +63,15 @@ RowUi 数组 `[{name, type, action?}]`，与顶层 `login` 函数成对，声明
 
 ## 函数契约
 
-| 函数 | 入参 | 返回 |
-|---|---|---|
-| `search(key, page)` | 搜索词；页码从 1 起 | `SearchBook[]` |
-| `explore(url, page)` | 分类地址（`exploreUrl` 条目的 url 段，原样传入）；页码从 1 起 | `SearchBook[]`，契约同 search |
-| `getBookInfo(book)` | 书籍对象（已含 search 阶段字段） | 覆盖字段对象 |
-| `getChapters(book)` | 书籍对象 | `Chapter[]`，数组序即目录序 |
-| `getContent(chapter, book)` | 章节、书籍对象；另有绑定 `nextChapterUrl`（可能 null） | 正文字符串，空即失败 |
-| `login()` | 无参；`source.getLoginInfo()` 读表单数据（JSON 字符串） | 无返回值要求；`throw` 即失败，内容作为提示 |
-| `getReviewSummary(chapter, book)` | `chapter`/`book` | `[{paraIndex, count, paraData?}]` 数组或 JSON 字符串 |
+| 函数                                                        | 入参                                                                                | 返回                                                         |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `search(key, page)`                                         | 搜索词；页码从 1 起                                                                 | `SearchBook[]`                                               |
+| `explore(url, page)`                                        | 分类地址（`exploreUrl` 条目的 url 段，原样传入）；页码从 1 起                       | `SearchBook[]`，契约同 search                                |
+| `getBookInfo(book)`                                         | 书籍对象（已含 search 阶段字段）                                                    | 覆盖字段对象                                                 |
+| `getChapters(book)`                                         | 书籍对象                                                                            | `Chapter[]`，数组序即目录序                                  |
+| `getContent(chapter, book)`                                 | 章节、书籍对象；另有绑定 `nextChapterUrl`（可能 null）                              | 正文字符串，空即失败                                         |
+| `login()`                                                   | 无参；`source.getLoginInfo()` 读表单数据（JSON 字符串）                             | 无返回值要求；`throw` 即失败，内容作为提示                   |
+| `getReviewSummary(chapter, book)`                           | `chapter`/`book`                                                                    | `[{paraIndex, count, paraData?}]` 数组或 JSON 字符串         |
 | `getReviewDetail(chapter, book, paraIndex, paraData, page)` | 同上 + `paraIndex`（段落序号）/`paraData`（summary 附加数据）/`page`（页码从 1 起） | `{items: [{content, ...}], nextPageUrl?}` 对象或 JSON 字符串 |
 
 返回数组/对象或 `JSON.stringify` 字符串均可（引擎收字符串直接解析，收对象自动转 JSON）。
@@ -116,9 +127,12 @@ CookieStore）。button 项 `action` 在脚本作用域执行，绑定 `result`=
   `java.refreshTocUrl`、`java.initUrl`、`java.getStrResponse` 不可用。
 - **HTML 解析用 Jsoup 直调**（锚 `JsTest.jsoupFromJsScope`）：
   ```js
-  const doc = org.jsoup.Jsoup.parse(html)
+  const doc = org.jsoup.Jsoup.parse(html);
   for (const el of doc.select("div.item")) {
-    list.push({ name: el.select("a.title").text(), bookUrl: el.select("a").attr("abs:href") })
+    list.push({
+      name: el.select("a.title").text(),
+      bookUrl: el.select("a").attr("abs:href"),
+    });
   }
   ```
   JSON API 用 `JSON.parse(java.ajax(url))`。
@@ -131,7 +145,6 @@ CookieStore）。button 项 `action` 在脚本作用域执行，绑定 `result`=
   `String(book.bookUrl).replace(/\/+$/, "")`；拼接、模板字符串、传 Java 方法参数、
   作返回对象字段值（`JSON.stringify` 自动解包）直接用。
 - 绑定 `source`/`cookie`/`cache`/`baseUrl` 可直接使用；函数参数同时是同名绑定。
-  `jsLib` 内函数取不到调用方绑定，依赖经参数传入或 `this` 解构（同 [[js-api.md]] jsLib 契约）。
 - 每次调用在新 scope 执行主脚本，顶层变量不跨调用保留；跨请求状态存
   `cache.put/get` 或 `source.setVariable/getVariable`。
 - ES6 边界同规则 JS，见 [[js-api.md]] §ES6+ 兼容性。
@@ -140,12 +153,12 @@ CookieStore）。button 项 `action` 在脚本作用域执行，绑定 `result`=
 
 将 verify.js（Node.js）验证过的数据流和解析逻辑迁移到书源函数，不要机械复制异步控制流：
 
-| verify.js | mainJs |
-|---|---|
-| `fetch(url)` + await | `java.ajax(url)`（同步） |
-| `cheerio.load(html)` / `$('a').text()` | `org.jsoup.Jsoup.parse(html)` / `.select('a').text()` |
-| `crypto-js` | `CryptoJS.*` 或 `java.createSymmetricCrypto` 族 |
-| `new URL(rel, base)` | 章节相对 url 交给应用补全；其余 `java.toURL(rel, base)` |
+| verify.js                                  | mainJs                                                                  |
+| ------------------------------------------ | ----------------------------------------------------------------------- |
+| `fetch(url)` + await                       | `java.ajax(url)`（同步）                                                |
+| `cheerio.load(html)` / `$('a').text()`     | `org.jsoup.Jsoup.parse(html)` / `.select('a').text()`                   |
+| `crypto-js`                                | `CryptoJS.*` 或 `java.createSymmetricCrypto` 族                         |
+| `new URL(rel, base)`                       | 章节相对 url 交给应用补全；其余 `java.toURL(rel, base)`                 |
 | 字符串链式操作 `str.replace(/re/, ...)` 等 | Java 来源值（`book.*`、Jsoup、`java.ajax()` 返回）先 `String(...)` 再链 |
 
 ## 校验
@@ -155,4 +168,4 @@ node scripts/validate-jssource.js path/to/source.js
 ```
 
 检查：整文件语法（`vm.Script`）、Rhino 不兼容语法、`java.*` 是否在 JsExtensions 面内、
-`source` 必填键与类型、三个必备函数存在、剥除键/用户态键提示。
+`config` 必填键与类型、三个必备函数存在、剥除键/用户态键提示。

@@ -261,14 +261,22 @@ function main() {
       }
     }
     const [s, gbi, gc, gct, exp, lgn, rs, rd] = probe.fns;
-    [
-      ["search", s],
-      ["getChapters", gc],
-      ["getContent", gct],
-    ].forEach(([name, t]) => {
+    // 文件源(bookSourceType=3)详情页直转下载导入:目录/正文函数不参与,downloadUrls 由 getBookInfo 供给
+    const isFileSource = probe.config && probe.config.bookSourceType === 3;
+    const required = isFileSource
+      ? [
+          ["search", s],
+          ["getBookInfo", gbi],
+        ]
+      : [
+          ["search", s],
+          ["getChapters", gc],
+          ["getContent", gct],
+        ];
+    required.forEach(([name, t]) => {
       if (t !== "function") errors.push(`缺少必备函数 ${name}`);
     });
-    if (gbi !== "function")
+    if (!isFileSource && gbi !== "function")
       console.log("(getBookInfo 未定义 — 可选,详情沿用 search 阶段字段)");
     if (probe.config) {
       const eu = probe.config.exploreUrl;

@@ -1,7 +1,9 @@
 # 纯JS单文件书源（仅本 fork）
 
 一个 `.js` 文件即一个完整书源：顶层为一个 `config` 配置对象与若干 `function` 声明，声明即生效。
-`search` / `getChapters` / `getContent` 必备（缺失在导入/保存时报错），`getBookInfo` 可选，
+`search` / `getChapters` / `getContent` 必备（缺失在导入/保存时报错），`getBookInfo` 可选；
+文件源（`bookSourceType: 3`）必备的是 `search` + `getBookInfo`，目录/正文函数可省略
+（详情页直转下载导入，`downloadUrls` 契约见 getBookInfo 覆盖白名单）。
 `explore` 与 `config.exploreUrl` 成对（声明分类未实现函数在导入时报错）。
 交付物是 `.js` 文件，用户在源管理页"新建JS源"粘贴，或直接导入 `.js` 文件/直链。
 
@@ -101,8 +103,10 @@ CookieStore）。button 项 `action` 在脚本作用域执行，绑定 `result`=
 `wordCount`（字符串）/`latestChapterTitle`/`tocUrl`/`type`。`origin` 系字段由应用注入。
 
 **getBookInfo 覆盖白名单**：`name`/`author`/`intro`/`coverUrl`/`kind`/`wordCount`/
-`latestChapterTitle`/`tocUrl`/`type`/`variable`，只有写出的键才覆盖，其余键忽略。
+`latestChapterTitle`/`tocUrl`/`type`/`variable`/`downloadUrls`，只有写出的键才覆盖，其余键忽略。
 `tocUrl` 缺省用 `book.bookUrl`；`variable` 值须是 JSON 字符串（`'{"k":"v"}'`）。
+`downloadUrls` 是字符串数组（相对地址按 `book.bookUrl` 补全），文件源必填：详情页据此弹
+下载列表，选中项下载导入为本地书。
 
 **Chapter**：`title`、`url` 必填，缺失的条目被丢弃；相对 `url` 按 `book.tocUrl` 补全。`getContent` 的第三个参数 `nextChapterUrl` 由应用传入，纯 JS 源自行决定是否使用。
 分卷行：`isVolume: true` 且 `url` 与 `title` 相同，不抓正文。可选 `isVip`/`isPay`/

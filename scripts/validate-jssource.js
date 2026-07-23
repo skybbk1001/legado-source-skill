@@ -224,7 +224,7 @@ function main() {
     probe = vm.runInContext(
       text +
         "\n;({ configType: typeof config," +
-        " fns: [typeof search, typeof getBookInfo, typeof getChapters, typeof getContent, typeof explore, typeof login, typeof getReviewSummary, typeof getReviewDetail]," +
+        " fns: [typeof search, typeof getBookInfo, typeof getChapters, typeof getContent, typeof explore, typeof login, typeof getReviewSummary, typeof getReviewDetail, typeof loginUi, typeof loginAction]," +
         ' config: typeof config === "object" ? config : null })',
       context,
       { timeout: 3000 },
@@ -260,7 +260,7 @@ function main() {
           warnings.push(`config 未知键: ${k}`);
       }
     }
-    const [s, gbi, gc, gct, exp, lgn, rs, rd] = probe.fns;
+    const [s, gbi, gc, gct, exp, lgn, rs, rd, luFn, laFn] = probe.fns;
     // 文件源(bookSourceType=3)详情页直转下载导入:目录/正文函数不参与,downloadUrls 由 getBookInfo 供给
     const isFileSource = probe.config && probe.config.bookSourceType === 3;
     const required = isFileSource
@@ -320,6 +320,15 @@ function main() {
       }
       if (luDeclared && lgn !== "function") {
         errors.push("声明了 loginUi 须配对实现 login() — 表单登录提交时调用");
+      }
+      // 登录UI v2:loginUi 函数形态,与 config.loginUi 数据互斥,配对 loginAction
+      if (luFn === "function") {
+        if (luDeclared)
+          errors.push("loginUi 函数与 config.loginUi 数据只能二选一");
+        if (laFn !== "function")
+          errors.push(
+            "声明了 loginUi 函数(登录UI v2)须配对实现 loginAction(action, state, form)",
+          );
       }
     }
     if (

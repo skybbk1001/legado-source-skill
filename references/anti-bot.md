@@ -169,6 +169,41 @@ java.HMacHex(data, "HmacSHA256", key);  // HMAC
 
 - `loginCheckJs` 检测登录状态，失效时触发重登
 
+### 登录UI v2（显式状态协议）
+
+声明 `loginUi(state)` + `loginAction(action, state, form)` 即启用：JS 源写顶层函数；
+声明式源两函数放 loginUrl 的 JS，loginUi 字段写 `{"version": 2}`。
+state 由应用持有，弹窗关闭即弃；命令对象返回什么发生什么：
+
+```js
+function loginUi(state) {
+  if (!state.step) return { rows: [
+    { key: "phone", name: "手机号", type: "text" },
+    { name: "发送验证码", type: "button", action: "sendCode" }
+  ]};
+  return { rows: [
+    { key: "code", name: "验证码", type: "text" },
+    { name: "重新发码", type: "button", action: "sendCode", countdown: 60 },
+    { name: "登录", type: "button", action: "verify" }
+  ]};
+}
+function loginAction(action, state, form) {
+  if (action == "sendCode") {
+    const r = JSON.parse(java.ajax(`https://site.com/sms?phone=${form.phone}`));
+    if (!r.ok) return { error: { phone: r.msg } };
+    return { state: { step: "code", phone: form.phone } };
+  }
+  const r = JSON.parse(java.ajax(`https://site.com/verify?phone=${state.phone}&code=${form.code}`));
+  if (!r.ok) return { error: { code: "验证码错误" } };
+  return { login: { token: r.token }, close: true };
+}
+```
+
+命令：`state`（重渲染）/`error: {key: 消息}`（字段红字）/`login`（持久化，重开按 key 回填）/`close`。
+行类型：`text` / `password` / `label`（name 即内容）/ `select`（options 单选，值为选项字符串）/
+`button`（countdown 秒数，动作成功后起跳）。提示用 `java.toast`，外跳用 `java.startBrowser`，
+图形验证码用 `java.getVerificationCode(imageUrl)`。
+
 ## 7. 降级策略
 
 | 主方式 | 备用方案 | 实现方式 |

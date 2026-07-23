@@ -48,6 +48,18 @@
       "prompt": "我只有 Node.js，没有安装任何 npm 包。需要验证一个书源的 JSON API 搜索和正文是否非空。应该怎么组织 tmp/verify.js 的依赖？",
       "expected_output": "默认使用 Node 内置 fetch、URL 和断言完成 API 验证；不要求 cheerio；只有离线 CSS 选择器验证时才把 cheerio 作为可选依赖并明确安装命令",
       "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "用户给了一个阅读类 APK 路径，要写阅读T书源。请说明应走哪条采集轨、打开哪个 reference、进入 Phase 5 前 tmp 里要有什么。",
+      "expected_output": "主轨 workflow-app（references/workflow-app.md）；Phase 1A 起；进入 Phase 5 前满足合流契约：notes.md、响应样本、verify PASS、格式意向（默认纯 JS）；禁止无依据猜签名",
+      "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "帮我给 https://www.example-novel.com 写书源，只有网址。不要展开 App/smali 步骤。",
+      "expected_output": "路由到 workflow-web；不加载 workflow-app 的 smali/IDA 步骤；按 Web Phase 1 侦察；合流后再 Phase 5；默认纯 JS 除非用户要 JSON",
+      "files": []
     }
   ]
 }

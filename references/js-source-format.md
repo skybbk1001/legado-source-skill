@@ -47,7 +47,8 @@ function getContent(chapter, book) {
 
 键名与 BookSource 实体字段逐字对应（GSON 直转）。常用可选键：
 `header`（JSON 字符串）、`loginUrl`（登录页地址，WebView 登录）、`loginUi`（表单登录，
-RowUi 数组 `[{name, type, action?}]`，与顶层 `login` 函数成对，声明未实现导入时报错；
+RowUi 数组 `[{name, type, action?}]`，与顶层 `login` 函数成对；动态 UI 使用
+`loginUi(state)` + `loginAction(action, state, form)`，详细协议见 [[login.md]]；
 每项须非空 `name`，空数组视同未声明；`loginCheckJs` 对 JS 源无消费）、
 `concurrentRate`、`enabledCookieJar`、
 `bookSourceGroup`、`bookSourceComment`、`variableComment`。
@@ -78,11 +79,9 @@ RowUi 数组 `[{name, type, action?}]`，与顶层 `login` 函数成对，声明
 
 返回数组/对象或 `JSON.stringify` 字符串均可（引擎收字符串直接解析，收对象自动转 JSON）。
 
-**登录**：WebView 形态只声明 `loginUrl`；表单形态声明 `loginUi` + 实现 `login`。
-提交流程=表单数据 AES 存储（`source.getLoginInfo()` 可读）→ 调 `login`；成功后
-`source.putLoginHeader(json)` 存登录头（本源后续请求自动附带，含 `Cookie` 键同步写
-CookieStore）。button 项 `action` 在脚本作用域执行，绑定 `result`=当前表单数据对象；
-填 `http(s)` 地址则点击打开浏览器。管理列表与编辑器菜单的"登录"入口由
+**登录**：WebView 形态只声明 `loginUrl`；静态表单形态声明 `loginUi` + 实现 `login`；
+动态形态实现 `loginUi(state)` + `loginAction(action, state, form)`。提交流程、状态、
+错误、验证码和反爬联动见 [[login.md]]。管理列表与编辑器菜单的"登录"入口由
 `loginUrl`/`loginUi` 任一非空点亮。
 
 **段评**：正文段落级评论，`getReviewSummary` + `getReviewDetail` 成对声明即启用，缺一在导入/

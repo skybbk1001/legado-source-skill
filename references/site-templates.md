@@ -126,7 +126,7 @@ XHR 返回 JSON，反爬弱。
 
 ## 3. 需登录站
 
-需登录 cookie。`loginUi` 写表单，`loginCheckJs` 验证。
+需登录 cookie。登录字段和校验见 [[login.md]]；本例使用静态表单。
 
 ```json
 {
@@ -157,7 +157,7 @@ XHR 返回 JSON，反爬弱。
 - `loginCheckJs` 必须返回 `StrResponse`
 - 重登：`source.removeLoginInfo()` + `java.toast`
 
-CF 模板见 [[references/anti-bot.md]]。
+动态登录模板见 [[references/login.md]]；CF 模板见 [[references/anti-bot.md]]。
 
 ---
 

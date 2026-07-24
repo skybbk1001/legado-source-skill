@@ -17,7 +17,7 @@
 | `concurrentRate` |  | 字符串。`"1000"`=每次请求间隔 ≥1s（最小间隔模式）；`"N/M"`=每 M 毫秒最多 N 次（如 `"3/1000"`）；`"0"`/空=不限流。单次限流优先写 `"1000"` 而非 `"1/1000"`（后者走计数窗口逻辑，效果相近但非同一路径） |
 | `bookUrlPattern` |  | 详情页 URL 正则（外部链接识别） |
 | `jsLib` |  | 共享 JS 库（多规则复用函数），**无 java/cache/cookie 等全局变量，用 this 解构** |
-| `loginUrl` / `loginUi` / `loginCheckJs` |  | 登录三件套，见 [[references/anti-bot.md]] |
+| `loginUrl` / `loginUi` / `loginCheckJs` |  | 登录字段；完整协议见 [[login.md]]，反爬联动见 [[anti-bot.md]] |
 | `coverDecodeJs` |  | 封面解密 JS：`result`=封面 InputStream、`src`=图片 URL，须返回 ByteArray。见 [[references/js-api.md]] §封面解密 |
 | `variableComment` |  | 自定义变量说明（变量设置 UI 显示） |
 | `exploreScreen` |  | 发现页筛选规则（动态筛选条件） |

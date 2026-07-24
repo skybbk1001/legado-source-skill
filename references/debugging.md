@@ -115,7 +115,7 @@ java.logType(variable);
 
 | 现象 | 处理 |
 |---|---|
-| CF 验证页 | 按 [[references/anti-bot.md]] 配 `loginCheckJs` |
+| CF 验证页 | 按 [[references/anti-bot.md]] 处理挑战；登录态问题见 [[references/login.md]] |
 | 浏览器能开、App 不能 | cookie/session，`enabledCookieJar: true` 或 WebView |
 | WebView 失败 | 后备到 `startBrowser` 手动 |
 | 频繁被封 IP | `concurrentRate` 调大 |
@@ -125,9 +125,9 @@ java.logType(variable);
 
 | 现象 | 处理 |
 |---|---|
-| 需登录 | `loginUrl` + `loginUi` + `loginCheckJs` |
-| 登录后 cookie 失效 | `loginCheckJs` 检测 → 重登 |
-| 用户改密 | `loginCheckJs` 里 `source.removeLoginInfo()` |
+| 需登录 | 按 [[references/login.md]] 选择 WebView、静态表单或动态状态 UI |
+| 登录后 cookie 失效 | 用真实 `401`/未登录响应判断，清理登录信息后重登 |
+| 用户改密 | 调用 `source.removeLoginInfo()`，不要继续复用旧 token |
 
 ## 性能 / 行为
 

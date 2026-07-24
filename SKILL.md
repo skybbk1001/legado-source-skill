@@ -128,7 +128,8 @@ JS：整文件语法、Rhino 面、`java.*`、config、必备函数契约。
 | 列表跨兄弟节点 | JS bookList + `$.xxx` | [[references/rule-syntax.md]] §bookList |
 | API id 拼 URL | 拼好 bookUrl | [[references/rule-syntax.md]] §JsonPath |
 | 阅读 JS API | — | [[references/js-api.md]] |
-| CF/挑战/403/登录 | — | [[references/anti-bot.md]] |
+| 登录 UI / 登录态 / 多步认证 | — | [[references/login.md]] |
+| CF/挑战/403/认证态联动 | — | [[references/anti-bot.md]] |
 | 搜索空/字段空/死循环/乱码 | — | [[references/debugging.md]] |
 | 站点骨架 | — | [[references/site-templates.md]] |
 | 纯 JS 契约/迁移 | — | [[references/js-source-format.md]] |

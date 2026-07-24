@@ -157,52 +157,20 @@ java.HMacHex(data, "HmacSHA256", key);  // HMAC
 
 详见 [[js-api.md]] §加密。
 
-## 6. 登录站点
+## 6. 认证态与反爬联动
 
-```json
-{
-  "loginUrl": "https://site.com/login,{\"method\":\"POST\",\"body\":\"username={{username}}&password={{password}}\"}",
-  "loginUi": "[{\"name\":\"username\",\"type\":\"text\"},{\"name\":\"password\",\"type\":\"password\"}]",
-  "loginCheckJs": "(() => { let res = result; if (String(res.body()).includes('请先登录')) { source.removeLoginInfo(); java.toast('登录已过期'); } return res; })()"
-}
-```
+登录 UI、登录态保存和多步登录协议见 [[login.md]]。本节只处理认证失败与反爬
+挑战同时出现的场景：
 
-- `loginCheckJs` 检测登录状态，失效时触发重登
+| 现象 | 优先判断 | 处理 |
+|---|---|---|
+| `401` 或“请先登录” | 登录态失效 | 清理登录信息并让用户重新登录 |
+| `403` 且登录态有效 | Referer、频率、IP 或权限 | 对比请求头、放慢请求，不要盲目重登 |
+| 登录页/接口返回 CF 或 JS 挑战 | 认证流程被反爬拦截 | 按本文件的 WebView/浏览器降级处理 |
+| 登录成功但业务接口仍拒绝 | Cookie/header 未保存或作用域不对 | 开启 Cookie Jar，检查登录头和实际请求 |
 
-### 登录UI v2（显式状态协议）
-
-声明 `loginUi(state)` + `loginAction(action, state, form)` 即启用：JS 源写顶层函数；
-声明式源两函数放 loginUrl 的 JS，loginUi 字段写 `{"version": 2}`。
-state 由应用持有，弹窗关闭即弃；命令对象返回什么发生什么：
-
-```js
-function loginUi(state) {
-  if (!state.step) return { rows: [
-    { key: "phone", name: "手机号", type: "text" },
-    { name: "发送验证码", type: "button", action: "sendCode" }
-  ]};
-  return { rows: [
-    { key: "code", name: "验证码", type: "text" },
-    { name: "重新发码", type: "button", action: "sendCode", countdown: 60 },
-    { name: "登录", type: "button", action: "verify" }
-  ]};
-}
-function loginAction(action, state, form) {
-  if (action == "sendCode") {
-    const r = JSON.parse(java.ajax(`https://site.com/sms?phone=${form.phone}`));
-    if (!r.ok) return { error: { phone: r.msg } };
-    return { state: { step: "code", phone: form.phone } };
-  }
-  const r = JSON.parse(java.ajax(`https://site.com/verify?phone=${state.phone}&code=${form.code}`));
-  if (!r.ok) return { error: { code: "验证码错误" } };
-  return { login: { token: r.token }, close: true };
-}
-```
-
-命令：`state`（重渲染）/`error: {key: 消息}`（字段红字）/`login`（持久化，重开按 key 回填）/`close`。
-行类型：`text` / `password` / `label`（name 即内容）/ `select`（options 单选，值为选项字符串）/
-`button`（countdown 秒数，动作成功后起跳）。提示用 `java.toast`，外跳用 `java.startBrowser`，
-图形验证码用 `java.getVerificationCode(imageUrl)`。
+不要把浏览器抓到的业务 Cookie、挑战 Cookie 或 token 硬编码到源中。登录完成后
+必须用一个需要认证的业务请求验证状态。
 
 ## 7. 降级策略
 

@@ -1,8 +1,8 @@
 # App 采集轨（Phase 1A–4A）
 
 > 由主 skill Phase 0 路由到本文件。完成后须满足主文「合流契约」再进入 Phase 5。  
-> **工具：** mt-apk-mcp（APK 结构/smali/字符串/xref）、ida-pro-mcp（native `.so`）。  
-> capstone 仅在 IDA 不可用时作反汇编兜底，默认不走。
+> **工具：** mt-apk-mcp（APK 结构/smali/字符串/xref）、ida-pro-mcp（native `.so`）、so-mcp（native `.so`）。  
+> capstone 仅在 IDA/so-mcp 不可用时作反汇编兜底，默认不走。
 
 ## 硬规则
 

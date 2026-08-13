@@ -60,6 +60,36 @@
       "prompt": "帮我给 https://www.example-novel.com 写书源，只有网址。不要展开 App/smali 步骤。",
       "expected_output": "路由到 workflow-web；不加载 workflow-app 的 smali/IDA 步骤；按 Web Phase 1 侦察；合流后再 Phase 5；默认纯 JS 除非用户要 JSON",
       "files": []
+    },
+    {
+      "id": 11,
+      "prompt": "帮我写一个阅读T定时任务，每天早上 9 点请求签到接口，成功后发通知。",
+      "expected_output": "路由到 references/auto-task.md；产出 AutoTaskRule JSON 而非书源；cron 为 0 9 * * *；script 使用阅读T JS API 请求接口并返回 notify 动作；不硬编码未知鉴权；通过 validate-autotask.js，并说明 App 内导入调试和未联调边界",
+      "files": []
+    },
+    {
+      "id": 12,
+      "prompt": "这个语音接口 POST /tts，参数是 text、speed、voice，返回 audio/mpeg。有男声 m1 和女声 f1，帮我做成阅读T在线朗读引擎。",
+      "expected_output": "路由到 references/http-tts.md；产出 HttpTTS JSON 而非听书源；url 规则消费 speakText/speakSpeed/speakVoice；contentType 为 audio/mpeg；voices 含唯一 id 及合法 gender；通过 validate-http-tts.js，并说明 App 内导入预览和未试听边界",
+      "files": []
+    },
+    {
+      "id": 13,
+      "prompt": "给 HTTP 在线朗读引擎加三个音色，但请求 URL 里只用了 speakText。这样可以吗？",
+      "expected_output": "指出多音色请求规则必须消费 speakVoice，否则选择不会传给服务端；说明空 voices 才表示单个默认音色；区分音色候选、角色画像和角色配音；不要扩展成 Android 系统 TTS 或角色标注实现",
+      "files": []
+    },
+    {
+      "id": 14,
+      "prompt": "定时任务 cron 写 '30 9 1-7 * 1'，会在什么时候运行？",
+      "expected_output": "日期与星期是 OR 匹配：每月 1-7 日的 09:30 以及每个周一的 09:30；引用 auto-task.md Cron 契约的 OR 语义说明",
+      "files": []
+    },
+    {
+      "id": 15,
+      "prompt": "HTTP TTS 引擎配置里 speakSpeed 传什么范围？",
+      "expected_output": "UI 配置范围 0-45，引擎实际收到 +5 偏移后的 5-50；提醒按服务端契约映射",
+      "files": []
     }
   ]
 }

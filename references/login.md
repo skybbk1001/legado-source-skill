@@ -137,10 +137,14 @@ function loginAction(action, state, form) {
 | `password` | `key`、`name` | 密码输入框 |
 | `label` | `name` | 只读提示文字 |
 | `select` | `key`、`name`、`options` | 单选下拉框，值为选项字符串 |
+| `toggle` | `name`；参与数据时还需 `key` | 开关，值为字符串 `"true"`/`"false"`；可选 `action` 在切换时派发 |
 | `button` | `name`、`action` | 调用 `loginAction`；可选 `countdown` 秒数 |
 
-输入行的 `key` 必须稳定且唯一。按钮不需要 `key`。UI 函数只负责根据 state
-生成界面，不要在其中发请求或写登录信息。
+`key` 必须稳定且唯一。只有当前页面中带 `key` 的输入、单选和开关行进入
+`form = {key: 当前值}`；不带 `key` 的行只显示。切到二级页面后，已消失的一级字段
+不在下一次 action 的 `form` 中，跨步骤所需值应由一级 action 放入 `state`。
+回填优先级为行的 `value` > 本次弹窗已输入 > 已存登录信息同 key 值；固定 `value`
+会覆盖已存值。UI 函数只负责根据 state 生成界面，不要在其中发请求或写登录信息。
 
 ### 4.2 action 返回值
 
@@ -148,9 +152,9 @@ function loginAction(action, state, form) {
 
 | 键 | 作用 |
 |---|---|
-| `state` | 替换状态并重新渲染 UI；弹窗关闭后状态丢弃 |
+| `state` | 整体替换状态并重新渲染 UI；弹窗关闭后状态丢弃 |
 | `error` | 按字段显示错误；`_form` 表示表单级错误 |
-| `login` | 持久化登录头或登录信息；重新打开时按键回填 |
+| `login` | 整体覆盖 AES 登录信息；重新打开时按 key 回填，不保存登录头 |
 | `close` | 关闭登录 UI；通常与成功的 `login` 一起返回 |
 
 常见返回组合：
@@ -161,6 +165,10 @@ function loginAction(action, state, form) {
 
 `state` 只保存继续下一步所需的非敏感值，例如手机号、地区或流程 ID。密码、
 验证码和完整响应不要放进 state、日志或 `cache`。
+
+`login` 不是增量合并：只返回 `{ login: { remember: form.remember } }` 会覆盖原有账号、
+token 等登录信息。需要保留的字段必须一并返回；认证 header 另用
+`source.putLoginHeader(json)` 保存。toggle 也不自动持久化，只有被放进 `login` 对象才会保存。
 
 ### 4.3 特殊交互
 

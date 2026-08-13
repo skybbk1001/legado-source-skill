@@ -1,0 +1,9 @@
+{
+  "id": "daily-checkin",
+  "name": "每日签到",
+  "enable": true,
+  "cron": "0 9 * * *",
+  "script": "var body = java.ajax('https://example.com/checkin');\n({type:'notify', title:'每日签到', content:String(body)})",
+  "header": "{\"User-Agent\":\"Mozilla/5.0\"}",
+  "enabledCookieJar": true
+}

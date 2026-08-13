@@ -1,0 +1,14 @@
+{
+  "id": 1720000000000,
+  "name": "示例 HTTP 朗读",
+  "url": "https://tts.example.com/v1/audio,{\"method\":\"POST\",\"body\":{\"text\":\"{{speakText}}\",\"speed\":{{String(speakSpeed)}},\"voice\":\"{{speakVoice}}\"}}",
+  "contentType": "audio/mpeg",
+  "concurrentRate": "0",
+  "enabledCookieJar": false,
+  "jsLib": "",
+  "pauseDuration": 0,
+  "voices": [
+    {"id": "female-1", "name": "女声 1", "gender": "female", "age": "young"},
+    {"id": "male-1", "name": "男声 1", "gender": "male", "age": "middle"}
+  ]
+}

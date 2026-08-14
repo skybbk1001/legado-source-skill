@@ -18,10 +18,10 @@
 | `bookUrlPattern` |  | 详情页 URL 正则（外部链接识别） |
 | `jsLib` |  | 共享 JS 库（多规则复用函数），**无 java/cache/cookie 等全局变量，用 this 解构** |
 | `loginUrl` / `loginUi` / `loginCheckJs` |  | 登录字段；完整协议见 [[login.md]]，反爬联动见 [[anti-bot.md]] |
-| `coverDecodeJs` |  | 封面解密 JS：`result`=封面 InputStream、`src`=图片 URL，须返回 ByteArray。见 [[references/js-api.md]] §封面解密 |
+| `coverDecodeJs` |  | 封面解密 JS：`result`=封面 InputStream、`src`=图片 URL，须返回 ByteArray。见 [[js-api.md]] §封面解密 |
 | `variableComment` |  | 自定义变量说明（变量设置 UI 显示） |
 | `exploreScreen` |  | 发现页筛选规则（动态筛选条件） |
-| `eventListener` + `customButton` |  | 事件回调，见 [[references/js-api.md]] §callBackJs |
+| `eventListener` + `customButton` |  | 事件回调，见 [[js-api.md]] §callBackJs |
 | `ruleExplore` + `exploreUrl` |  | 发现页，详见下文 §发现 |
 | `ruleSearch` / `ruleBookInfo` / `ruleToc` / `ruleContent` | ✓ | 四类规则对象，见下文 |
 

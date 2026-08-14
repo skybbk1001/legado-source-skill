@@ -1,6 +1,6 @@
 # 站点骨架
 
-按类型起手，按 [[SKILL.md]] 工作流实测。
+按类型起手，按主文（[[../SKILL.md]]）工作流实测。
 
 1. [HTML 文本站](#1-html-文本站)
 2. [JSON API 站](#2-json-api-站)
@@ -157,7 +157,7 @@ XHR 返回 JSON，反爬弱。
 - `loginCheckJs` 必须返回 `StrResponse`
 - 重登：`source.removeLoginInfo()` + `java.toast`
 
-动态登录模板见 [[references/login.md]]；CF 模板见 [[references/anti-bot.md]]。
+动态登录模板见 [[login.md]]；CF 模板见 [[anti-bot.md]]。
 
 ---
 
@@ -205,13 +205,13 @@ XHR 返回 JSON，反爬弱。
 
 要点：
 - 正文构造 `<img>` 序列，URL 后拼 `,{"headers":{"Referer":"..."}}`
-- 加密图片用 `imageDecode`，见 [[references/js-api.md]]
+- 加密图片用 `imageDecode`，见 [[js-api.md]]
 
 ---
 
 ## 发现页
 
-`exploreUrl` 用 `<js>` 返回分类数组（详见 [[references/fields.md]] §发现）。`ruleExplore` 结构与 `ruleSearch` 一致。
+`exploreUrl` 用 `<js>` 返回分类数组（详见 [[fields.md]] §发现）。`ruleExplore` 结构与 `ruleSearch` 一致。
 
 **搜索和发现结果结构相同时：只写 `exploreUrl`，不写 `ruleExplore`，引擎自动回退到 `ruleSearch`。** URL 分页用 `<page1,page2,page3>`，超出取最后一个值。
 

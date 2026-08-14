@@ -12,7 +12,7 @@ HTTP 在线朗读引擎是 `HttpTTS` 配置，用远程语音接口把文本转�
 2. 将动态值改为 URL 规则绑定：`speakText`、`speakSpeed`、`speakVoice`。完成标准：文本正确转义，选中音色能到达接口。
 3. 配置登录与错误处理。需要登录 UI 时看 [[login.md]]，规则 API 看 [[js-api.md]]。完成标准：凭据不硬编码，非音频响应能暴露服务端错误。
 4. 定义音色候选并运行 `scripts/validate-http-tts.js`。完成标准：JSON 与音色清单严格校验通过。
-5. 交付导入 JSON 和 App 内预览步骤；未真实试听时明确标注。
+5. 交付导入 JSON 和 App 内预览步骤；未真实试听时标注「未联调」。
 
 ## JSON 契约
 
@@ -63,4 +63,4 @@ URL 规则与书源 URL 规则相同，可声明 `method`、`body`、`headers` �
 - 至少验证一段含中文、标点和特殊字符的文本。
 - 多音色配置至少验证两个不同 `speakVoice` 到达服务端并产生预期音频。
 - HTTP 状态、`Content-Type` 和响应体符合音频契约；鉴权失败能给出可诊断信息。
-- `validate-http-tts.js` 通过；无法在 App 试听时明确“仅接口/语法验证”。
+- `validate-http-tts.js` 通过；无法在 App 试听时明确「仅接口/语法验证」。

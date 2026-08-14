@@ -1,6 +1,6 @@
 # App 采集轨（Phase 1A–4A）
 
-> 由主 skill Phase 0 路由到本文件。完成后须满足主文「合流契约」再进入 Phase 5。  
+> 由主文（[[../SKILL.md]]）Phase 0 路由到本文件。完成后须满足主文「合流契约」再进入 Phase 5。
 > **工具：** mt-apk-mcp（APK 结构/smali/字符串/xref）、ida-pro-mcp（native `.so`）、so-mcp（native `.so`）。  
 > capstone 仅在 IDA/so-mcp 不可用时作反汇编兜底，默认不走。
 
@@ -114,12 +114,10 @@
 
 ## 出口：合流契约
 
-进入主文 Phase 5 前确认：
+在满足主文「合流契约」四项（见 [[../SKILL.md]] §合流契约）的基础上，本轨另须：
 
-1. `notes.md`（含签名字段：`输入→步骤→样例`）
-2. 关键环节响应样本（`.json` 等）
-3. verify 全 PASS；或用户确认样本-only 时 notes 标明未联调
-4. 源格式意向（App 默认 **纯 JS 单文件**）
+- `notes.md` 中每个签名字段按「输入→步骤→输出样例」记录，可与抓包对照
+- 格式意向默认 **纯 JS 单文件源**（App 协议签名/加密不适合声明式管道）
 
 缺项不写源。
 

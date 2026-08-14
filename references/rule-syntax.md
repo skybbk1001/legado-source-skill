@@ -336,4 +336,4 @@ let opts = {"headers": {"Referer": baseUrl}};
 
 ## 8. 站点模板
 
-完整骨架见 [[references/site-templates.md]]。
+完整骨架见 [[site-templates.md]]。

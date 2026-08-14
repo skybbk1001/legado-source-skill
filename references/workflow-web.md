@@ -1,13 +1,13 @@
 # Web 采集轨（Phase 1–4）
 
-> 由主 skill Phase 0 路由到本文件。完成后须满足主文「合流契约」再进入 Phase 5。  
+> 由主文（[[../SKILL.md]]）Phase 0 路由到本文件。完成后须满足主文「合流契约」再进入 Phase 5。  
 > 工具：curl、playwright。反爬字段配置见 [[anti-bot.md]]。骨架见 [[site-templates.md]]。排障见 [[debugging.md]]。
 
 ## 快速路径
 
 - 只有站点 URL 或“帮我找规则”：从 Phase 1 开始。
 - 用户已提供完整 HTML/JSON 和接口契约：从 Phase 3 开始。
-- 无法访问站点但用户提供了完整响应样本：基于样本做 Phase 3–4（跳过真实请求处须在 `notes.md` 标明未实测）。
+- 无法访问站点但用户提供了完整响应样本：基于样本做 Phase 3–4（跳过真实请求处须在 `notes.md` 标注「未联调」）。
 
 ## 中间产物
 
@@ -115,11 +115,4 @@ node tmp/<source-id>/verify.js
 
 ## 出口：合流契约
 
-进入主文 Phase 5 前确认 `tmp/<source-id>/`：
-
-1. `notes.md` 含各环节输入→请求→输出
-2. 搜索/详情/目录/正文样本（扩展名正确）
-3. `verify.js` 全 PASS（或样本-only 时在 notes 标明未实测）
-4. 源格式意向：纯 JS（默认）或声明式 JSON
-
-缺项则留在本轨补齐，不要直接写源。
+满足主文「合流契约」四项（见 [[../SKILL.md]] §合流契约）后进入 Phase 5。缺项则留在本轨补齐，不要直接写源。

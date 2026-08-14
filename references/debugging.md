@@ -28,7 +28,7 @@ curl -i -A 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36' \
 
 ### 4. App 里实测
 
-装有 legado MCP 时直连阅读T：`save_source` 推送 → `debug_source` 跑管线 → `get_http_logs`/`get_http_log` 看 App 实发请求（SKILL.md Phase 7）。
+装有 legado MCP 时直连阅读T：`save_source` 推送 → `debug_source` 跑管线 → `get_http_logs`/`get_http_log` 看 App 实发请求（主文 Phase 7）。
 MCP 不可用时交付书源（JSON / `.js`）请用户导入实测并反馈结果。
 
 ### 5. JS 运行时值
@@ -57,10 +57,10 @@ java.logType(variable);
 | 完全无结果 | 站点是 JSON API，规则按 HTML 写 | Network 看 XHR；改用 `$.` JsonPath |
 | 完全无结果 | `bookList` 选错（匹配到 0 个元素） | 调试输出看 `bookList` 匹配数 |
 | 只出 1 条 | `bookList` 匹配到包装容器 | `bookList` 切到单项元素（如 `ul > li` 而非 `ul`） |
-| 缺字段（如作者空） | 字段在 `bookList` 元素之外的兄弟元素 | 切兄弟做 `bookList`（接受缺字段，详情页补全），或 JS bookList 拼对象（见 [[references/rule-syntax.md]] §bookList 进阶） |
+| 缺字段（如作者空） | 字段在 `bookList` 元素之外的兄弟元素 | 切兄弟做 `bookList`（接受缺字段，详情页补全），或 JS bookList 拼对象（见 [[rule-syntax.md]] §bookList 进阶） |
 | 缺字段（个别书空） | 选择器只对部分书生效 | 用 `\|\|` 回退：`primary@text\|\|fallback@text` |
 | 第 2 页起为空 | 站点无 `page` 参数，或参数名不是 `page` | 看实际翻页 URL 改 `{{page}}` 位置；不分页可去掉 |
-| POST 搜索后 302 跳转 | 重定向 URL 不带 cookie | `searchUrl` 用 JS（见 [[references/js-api.md]] §重定向搜索） |
+| POST 搜索后 302 跳转 | 重定向 URL 不带 cookie | `searchUrl` 用 JS（见 [[js-api.md]] §重定向搜索） |
 | `checkKeyWord` 报错 | 关键词太冷门，站点结果库无 | 改用站点确实有的常见词（如 "斗罗大陆"） |
 
 ### 详情
@@ -115,7 +115,7 @@ java.logType(variable);
 
 | 现象 | 处理 |
 |---|---|
-| CF 验证页 | 按 [[references/anti-bot.md]] 处理挑战；登录态问题见 [[references/login.md]] |
+| CF 验证页 | 按 [[anti-bot.md]] 处理挑战；登录态问题见 [[login.md]] |
 | 浏览器能开、App 不能 | cookie/session，`enabledCookieJar: true` 或 WebView |
 | WebView 失败 | 后备到 `startBrowser` 手动 |
 | 频繁被封 IP | `concurrentRate` 调大 |
@@ -125,7 +125,7 @@ java.logType(variable);
 
 | 现象 | 处理 |
 |---|---|
-| 需登录 | 按 [[references/login.md]] 选择 WebView、静态表单或动态状态 UI |
+| 需登录 | 按 [[login.md]] 选择 WebView、静态表单或动态状态 UI |
 | 登录后 cookie 失效 | 用真实 `401`/未登录响应判断，清理登录信息后重登 |
 | 用户改密 | 调用 `source.removeLoginInfo()`，不要继续复用旧 token |
 

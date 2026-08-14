@@ -428,26 +428,37 @@ decodeImage(result, key);
 
 ### 回调事件（ruleContent.callBackJs，需顶层 `eventListener:true`）
 
-绑定 `event`(事件名)、`result`、`book`、`chapter`；`java` 仅在自定义按钮事件中可用。
-按钮事件返回 `true` 拦截默认动作，否则执行默认；其余事件返回值被忽略。
+绑定 `event`(事件名)、`result`、`book`、`chapter`（`chapter` 可能为 null）。`java` 为回调扩展类，
+所有交互事件均绑定，通知事件不绑定。
+
+**拦截判定（交互事件共用，锚 `SourceCallBack.callBackBtn`）**：脚本返回值转字符串后按
+`String.isTrue()` 判定——返回真值（非空且不是 `false`/`no`/`0`/`null`）拦截默认动作，
+返回 `false`/`no`/`0` 或空则继续执行默认动作。自定义按钮事件没有默认动作，返回值无实际效果。
+`result` 是只读绑定：脚本内重新赋值不会改变默认动作使用的原始值，自行处理内容须
+在脚本内完成（如 `java.copyText(...)`）并返回真值拦截默认动作。通知事件返回值被忽略。
 
 ```js
 (function() {
-  // 自定义按钮事件（customButton:true 时显示按钮），java.* 可用
   if (event === "clickCustomButton") {
     java.startBrowser(`https://example.com/chapter?id=${chapter?.index}`, "章节");
-    return true;   // 拦截默认动作
+    // 自定义按钮无默认动作,返回值无实际效果
+    return true;
   }
-  // 其它事件：返回值被忽略，只能改 result
   if (event === "clickShareBook") {
-    result = String(result).replace(/广告/g, "");
+    // 自行处理分享内容并拦截默认分享
+    java.copyText(String(result).replace(/广告/g, ""));
+    java.toast("已复制处理后的分享内容");
+    return true; // 返回 false/no/0/空 则继续执行默认分享
   }
 })();
 ```
 
-常用 `event` 值：`clickAuthor` `clickBookName` `clickCustomButton` `longClickCustomButton`
-`clickShareBook` `clickClearCache` `clickCopyBookUrl` `clickCopyTocUrl` `addBookShelf`
-`delBookShelf` `saveRead` `startRead` `endRead` `startShelfRefresh` `endShelfRefresh`。
+常用 `event` 值：
+交互：`clickBookName` `longClickBookName` `clickAuthor` `longClickAuthor`
+`clickCustomButton` `longClickCustomButton` `clickShareBook` `clickClearCache`
+`clickCopyBookUrl` `clickCopyTocUrl` `clickCopyPlayUrl` `clickBookLabel` `longClickBookLabel`
+通知：`addBookShelf` `delBookShelf` `saveRead` `startRead` `endRead`
+`startShelfRefresh` `endShelfRefresh`。
 
 ### 时间格式化
 

@@ -169,7 +169,10 @@ function main() {
   }
 
   // 3. java.* API 面
-  for (const call of new Set(clean.match(/\bjava\.\w+/g) || [])) {
+  //    先剔除 Packages 前缀引用（Packages.java.*/Packages.javax.* 是 Rhino 直调 Java 类的合法方式，
+  //    如 Packages.java.security.SecureRandom、Packages.javax.crypto.Cipher），只校验 JsExtensions 的 java.*
+  const cleanNoPackages = clean.replace(/\bPackages\s*\.\s*[\w.]+/g, " ");
+  for (const call of new Set(cleanNoPackages.match(/\bjava\.\w+/g) || [])) {
     if (RULE_ONLY_APIS.has(call)) {
       errors.push(
         `${call} — AnalyzeRule/AnalyzeUrl 专属,JS 源的 java=JsExtensions;` +
@@ -217,10 +220,10 @@ function main() {
     }
   });
 
-  // 5. 执行顶层声明,提取 config 与函数(空沙箱:顶层出现运行时调用会在此暴露)
+  // 5. 执行顶层声明,提取 config 与函数(沙箱注入 Packages 占位:顶层 lazy getter 引用是合法模式)
   let probe;
   try {
-    const context = vm.createContext({});
+    const context = vm.createContext({ Packages: {} });
     probe = vm.runInContext(
       text +
         "\n;({ configType: typeof config," +

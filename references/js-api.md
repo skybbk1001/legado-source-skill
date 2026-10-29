@@ -141,6 +141,26 @@ c.encryptHex(data);        // → Hex
 
 `key`/`iv`：String（UTF-8）或 ByteArray。
 
+### 原生 Java 加密（Packages 直调）
+
+JsExtensions 未覆盖时可直接调 JVM 类（详细边界见 [[js-source-format.md]] §运行环境）：
+
+```js
+// crypto-js random 在 Rhino 无安全随机源会抛错 — SecureRandom 生成随机 salt/IV
+const salt = java.hexDecodeToByteArray("0000000000000000");
+new Packages.java.security.SecureRandom().nextBytes(salt);
+
+// 任意字节 MD5（java.md5Encode 只吃字符串）
+Packages.java.security.MessageDigest.getInstance("MD5").digest(bytes);
+
+// 原生 AES（与 crypto-js OpenSSL 格式互通时可手拼 EvpKDF）
+const cipher = Packages.javax.crypto.Cipher.getInstance("AES/CBC/PKCS5Padding");
+cipher.init(Packages.javax.crypto.Cipher.ENCRYPT_MODE,
+  new Packages.javax.crypto.spec.SecretKeySpec(keyBA, "AES"),
+  new Packages.javax.crypto.spec.IvParameterSpec(ivBA));
+const ct = cipher.doFinal(plainBA);
+```
+
 ### 非对称加密
 
 ```js

@@ -148,6 +148,11 @@ RowUi 数组 `[{name, type, action?}]`，与顶层 `login` 函数成对；动态
   `String(book.bookUrl).replace(/\/+$/, "")`；拼接、模板字符串、传 Java 方法参数、
   作返回对象字段值（`JSON.stringify` 自动解包）直接用。
 - 绑定 `source`/`cookie`/`cache`/`baseUrl` 可直接使用；函数参数同时是同名绑定。
+- **直调任意 Java 类**：`Packages.java.*` / `Packages.javax.*` / `Packages.io.*` 可访问 JVM 全部类，
+  适合 JsExtensions 未暴露的能力（如 `Packages.java.security.SecureRandom` 安全随机、
+  `Packages.java.security.MessageDigest` 任意字节摘要、`Packages.javax.crypto.Cipher` 原生加解密）。
+  注意：顶层不要放 `Packages` 执行语句（顶层只允许 config 与函数声明），应包在函数内或用 lazy getter；
+  crypto-js 的 `random` 在 Rhino 无安全随机源会抛错，需要随机 salt/IV 时优先用 `SecureRandom`。
 - 每次调用在新 scope 执行主脚本，顶层变量不跨调用保留；跨请求状态存
   `cache.put/get` 或 `source.setVariable/getVariable`。
 - ES6 边界同规则 JS，见 [[js-api.md]] §ES6+ 兼容性。

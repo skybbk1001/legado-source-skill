@@ -167,7 +167,7 @@ JS：整文件语法、Rhino 面、`java.*`、config、必备函数契约。
 
 工具名：`save_source`、`debug_source`、`list_sources`、`get_source`、`delete_sources`、`get_http_logs`、`get_http_log`、`set_http_log_recording`。
 
-**流程：** `save_source` → `debug_source` → 必要时 `set_http_log_recording(true)` 再跑 → `get_http_logs`/`get_http_log` 看实发头 → 改源重推 → 确认 `list_sources`。HTTP 请求日志开关保持调试结束时的状态；未经用户明确要求，不调用 `set_http_log_recording(false)`，也不自动恢复原状态。
+**流程：** `save_source` → `debug_source` → 必要时 `set_http_log_recording(true)` 再跑 → `get_http_logs`/`get_http_log` 看实发头 → 改源重推 → 确认 `list_sources`。HTTP 请求日志开关保持开启状态。
 
 `debug_source` key：关键词=全管线；绝对 URL=详情；`::URL`=发现；`++URL`=目录；`--URL`=正文。
 
